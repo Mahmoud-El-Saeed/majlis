@@ -1,1 +1,32 @@
-docs/
+# Python / uv
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.ruff_cache/
+.pytest_cache/
+.mypy_cache/
+htmlcov/
+.coverage
+
+# Env & secrets (never commit real secrets)
+.env
+.env.*
+!.env.example
+
+# Node / Bun / frontend build output
+node_modules/
+frontend/dist/
+frontend/build/
+*.tsbuildinfo
+
+# Local data & volumes (postgres/qdrant data, sqlite files)
+data/
+*.sqlite3
+*.db
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
