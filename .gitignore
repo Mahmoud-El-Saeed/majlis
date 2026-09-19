@@ -30,3 +30,7 @@ data/
 .idea/
 .DS_Store
 Thumbs.db
+
+# Local agent tooling (never commit local skills/plugins)
+.agents/
+.opencode/
