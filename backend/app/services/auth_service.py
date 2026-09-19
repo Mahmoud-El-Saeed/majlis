@@ -1,3 +1,5 @@
+import asyncio
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import mail
@@ -28,7 +30,11 @@ async def signup(db: AsyncSession, data: SignupIn) -> tuple[User, str]:
     email = data.email.lower()
     existing = await user_repository.get_by_email(db, email)
     if existing:
-        raise AuthError("هذا البريد مسجل بالفعل.")
+        raise AuthError("Email already registered.")
+    # User.id is a Python-side UUID assigned on flush, so flush first to mint
+    # the id, send the email, and only then let the request commit. A mail
+    # failure raises before anything is committed: the transaction rolls back,
+    # no row survives, and the student can simply retry signup.
     user = User(
         email=email,
         hashed_password=get_password_hash(data.password),
@@ -36,14 +42,17 @@ async def signup(db: AsyncSession, data: SignupIn) -> tuple[User, str]:
         role="student",
         is_verified=False,
     )
-    user = await user_repository.create(db, user)
+    db.add(user)
+    await db.flush()
     token = create_verification_token(str(user.id))
     link = f"{settings.FRONTEND_URL}/verify?token={token}"
-    mail.send_email(
-        to=email,
-        subject="تفعيل حساب مجلس",
-        body=f"السلام عليكم،\nفعّل حسابك عبر الرابط:\n{link}\n",
+    await asyncio.to_thread(
+        mail.send_email,
+        email,
+        "تفعيل حساب مجلس",
+        f"السلام عليكم ورحمة الله وبركاته،\nفعّل حسابك عبر هذا الرابط:\n\n\n{link}\n",
     )
+    await db.refresh(user)
     return user, token
 
 
@@ -51,10 +60,10 @@ async def verify(db: AsyncSession, token: str) -> User:
     try:
         sub = decode_token(token, "verify")
     except Exception:
-        raise AuthError("رابط التفعيل غير صالح أو منتهي.") from None
+        raise AuthError("Invalid or expired activation link.") from None
     user = await user_repository.get_by_id(db, sub)
     if user is None:
-        raise AuthError("رابط التفعيل غير صالح أو منتهي.")
+        raise AuthError("Invalid or expired activation link.")
     user.is_verified = True
     await db.flush()
     return user
@@ -64,13 +73,13 @@ async def authenticate(db: AsyncSession, email: str, password: str) -> User:
     user = await user_repository.get_by_email(db, email.lower())
     if user is None:
         verify_password(password, DUMMY_HASH)
-        raise AuthError("بيانات الدخول غير صحيحة.")
+        raise AuthError("Incorrect email or password.")
     if not verify_password(password, user.hashed_password):
-        raise AuthError("بيانات الدخول غير صحيحة.")
+        raise AuthError("Incorrect email or password.")
     if not user.is_active:
-        raise AuthError("الحساب موقوف.")
+        raise AuthError("Account disabled.")
     if not user.is_verified:
-        raise AuthError("فعّل حسابك عبر البريد قبل تسجيل الدخول.")
+        raise AuthError("Please verify your email before logging in.")
     return user
 
 
@@ -82,10 +91,10 @@ async def refresh(db: AsyncSession, token: str) -> tuple[str, str]:
     try:
         sub = decode_token(token, "refresh")
     except Exception:
-        raise AuthError("جلسة منتهية. سجل الدخول مجددًا.") from None
+        raise AuthError("Session expired. Please log in again.") from None
     user = await user_repository.get_by_id(db, sub)
     if user is None or not user.is_active:
-        raise AuthError("جلسة منتهية. سجل الدخول مجددًا.")
+        raise AuthError("Session expired. Please log in again.")
     return tokens_for(user)
 
 
@@ -95,10 +104,11 @@ async def request_password_reset(db: AsyncSession, email: str) -> str | None:
         return None
     token = create_reset_token(str(user.id))
     link = f"{settings.FRONTEND_URL}/reset?token={token}"
-    mail.send_email(
-        to=user.email,
-        subject="استعادة كلمة مرور مجلس",
-        body=f"السلام عليكم،\nاستعد كلمة المرور عبر الرابط:\n{link}\n",
+    await asyncio.to_thread(
+        mail.send_email,
+        user.email,
+        "استعادة كلمة مرور مجلس",
+        f"السلام عليكم ورحمة الله وبركاته،\nاستعد كلمة المرور عبر هذا الرابط:\n\n\n{link}\n",
     )
     return token
 
@@ -107,9 +117,9 @@ async def confirm_password_reset(db: AsyncSession, token: str, new_password: str
     try:
         sub = decode_token(token, "reset")
     except Exception:
-        raise AuthError("رابط الاستعادة غير صالح أو منتهي.") from None
+        raise AuthError("Invalid or expired reset link.") from None
     user = await user_repository.get_by_id(db, sub)
     if user is None:
-        raise AuthError("رابط الاستعادة غير صالح أو منتهي.")
+        raise AuthError("Invalid or expired reset link.")
     user.hashed_password = get_password_hash(new_password)
     await db.flush()

@@ -12,7 +12,11 @@ from app.core.database import Base
 from app.models import user as _user  # noqa: F401
 
 settings = get_settings()
-SYNC_URL = settings.DATABASE_URL.replace("+asyncpg", "").replace("+aiosqlite", "")
+# Sync driver for migrations (asyncpg is async-only): postgres -> psycopg,
+# sqlite -> pysqlite. psycopg[binary] ships its own libpq, no system deps.
+SYNC_URL = (
+    settings.DATABASE_URL.replace("+asyncpg", "+psycopg").replace("+aiosqlite", "+pysqlite")
+)
 
 config = context.config
 target_metadata = Base.metadata

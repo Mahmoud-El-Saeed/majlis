@@ -24,7 +24,7 @@ async def test_student_signup_verify_login_me_refresh(client):
         json={"email": "student@example.com", "password": "secret1234"},
     )
     assert r.status_code == 401
-    assert "فعّل" in r.json()["detail"]
+    assert "verify your email" in r.json()["detail"]
 
     token = outbox[0]["body"].split("verify?token=")[1].split()[0].strip()
     r = await client.post("/api/v1/auth/verify", json={"token": token})
@@ -101,4 +101,32 @@ async def test_rate_limiting_enforced(client):
             json={"email": f"spam{i}@example.com", "password": "secret1234"},
         )
     assert r.status_code == 429
-    assert "كثيرة" in r.json()["detail"]
+    assert "Too many requests" in r.json()["detail"]
+
+
+async def test_signup_mail_failure_leaves_no_user_so_retry_works(client, monkeypatch):
+    import app.core.mail as mail_module
+
+    calls = {"n": 0}
+    real_send = mail_module.send_email
+
+    def flaky_send(to: str, subject: str, body: str) -> None:
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise ConnectionError("smtp down")
+        real_send(to, subject, body)
+
+    monkeypatch.setattr(mail_module, "send_email", flaky_send)
+
+    r = await client.post(
+        "/api/v1/auth/signup",
+        json={"email": "retry@example.com", "password": "secret1234"},
+    )
+    assert r.status_code == 502
+
+    # Retry must NOT hit "Email already registered": nothing was persisted.
+    r = await client.post(
+        "/api/v1/auth/signup",
+        json={"email": "retry@example.com", "password": "secret1234"},
+    )
+    assert r.status_code == 201, r.text

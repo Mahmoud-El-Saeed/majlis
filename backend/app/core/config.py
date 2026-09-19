@@ -1,7 +1,9 @@
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+
     DATABASE_URL: str = "postgresql+asyncpg://majlis:majlis@localhost:5432/majlis"
     REDIS_URL: str = "redis://localhost:6379/0"
     SECRET_KEY: str = "dev-only-insecure-secret-change-me"
@@ -17,8 +19,6 @@ class Settings(BaseSettings):
     RATE_LIMIT_SIGNUP_PER_MIN: int = 10
     RATE_LIMIT_LOGIN_PER_MIN: int = 10
     RATE_LIMIT_RESET_PER_MIN: int = 5
-
-    model_config = {"env_file": ".env", "extra": "ignore"}
 
 
 def get_settings() -> Settings:

@@ -1,4 +1,9 @@
-"""Dev SMTP via Mailpit (ticket 01). Production SMTP lands in ticket 13."""
+"""Dev SMTP via Mailpit (ticket 01). Production SMTP lands in ticket 13.
+
+Blocking smtplib is offloaded with asyncio.to_thread at call sites so the
+async event loop never blocks. Backend messages stay English; the frontend
+localizes them (default Arabic).
+"""
 
 import smtplib
 from email.message import EmailMessage
@@ -6,9 +11,6 @@ from email.message import EmailMessage
 from app.core.config import get_settings
 
 settings = get_settings()
-
-# In-memory outbox for tests (fake at seam boundary).
-OUTBOX: list[dict] = []
 
 
 def send_email(to: str, subject: str, body: str) -> None:
@@ -19,8 +21,3 @@ def send_email(to: str, subject: str, body: str) -> None:
     msg.set_content(body)
     with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=5) as s:
         s.send_message(msg)
-
-
-def queue_email(to: str, subject: str, body: str) -> None:
-    """Test seam: record instead of sending."""
-    OUTBOX.append({"to": to, "subject": subject, "body": body})

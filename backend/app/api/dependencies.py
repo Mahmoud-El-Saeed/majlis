@@ -2,7 +2,6 @@ from typing import Annotated
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
-from jwt.exceptions import InvalidTokenError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -19,13 +18,11 @@ TokenDep = Annotated[str, Depends(oauth2_scheme)]
 async def get_current_user(db: DbDep, token: TokenDep) -> User:
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="تعذر التحقق من الجلسة.",
+        detail="Could not validate session.",
         headers={"WWW-Authenticate": "Bearer"},
     )
     try:
         sub = decode_token(token, "access")
-    except InvalidTokenError:
-        raise credentials_exception from None
     except Exception:
         raise credentials_exception from None
     user = await user_repository.get_by_id(db, sub)

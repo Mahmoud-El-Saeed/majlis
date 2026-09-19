@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 
 class SignupIn(BaseModel):
@@ -35,11 +35,21 @@ class ResetConfirmIn(BaseModel):
     new_password: str = Field(min_length=8, max_length=128)
 
 
+class SignupOut(BaseModel):
+    id: str
+    email: str
+    message: str
+
+
+class MessageOut(BaseModel):
+    message: str
+
+
 class UserOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: str
     email: str
     full_name: str | None = None
     role: str
     is_verified: bool
-
-    model_config = {"from_attributes": True}
