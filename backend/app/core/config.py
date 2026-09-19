@@ -19,6 +19,10 @@ class Settings(BaseSettings):
     RATE_LIMIT_SIGNUP_PER_MIN: int = 10
     RATE_LIMIT_LOGIN_PER_MIN: int = 10
     RATE_LIMIT_RESET_PER_MIN: int = 5
+    RATE_LIMIT_INVITE_PER_MIN: int = 10
+    INVITE_TOKEN_EXPIRE_HOURS: int = 72
+    ADMIN_EMAIL: str | None = None
+    ADMIN_PASSWORD: str | None = None
 
 
 def get_settings() -> Settings:

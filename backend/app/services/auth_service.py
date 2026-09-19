@@ -14,7 +14,7 @@ from app.core.security import (
     get_password_hash,
     verify_password,
 )
-from app.models.user import User
+from app.models.user import Role, User
 from app.repositories.user_repository import user_repository
 from app.schemas.auth import SignupIn
 
@@ -39,7 +39,7 @@ async def signup(db: AsyncSession, data: SignupIn) -> tuple[User, str]:
         email=email,
         hashed_password=get_password_hash(data.password),
         full_name=data.full_name,
-        role="student",
+        role=Role.student,
         is_verified=False,
     )
     db.add(user)

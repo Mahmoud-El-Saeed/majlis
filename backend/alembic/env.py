@@ -9,14 +9,13 @@ from sqlalchemy.engine import create_engine
 from alembic import context
 from app.core.config import get_settings
 from app.core.database import Base
+from app.models import teacher_invite as _teacher_invite  # noqa: F401
 from app.models import user as _user  # noqa: F401
 
 settings = get_settings()
 # Sync driver for migrations (asyncpg is async-only): postgres -> psycopg,
 # sqlite -> pysqlite. psycopg[binary] ships its own libpq, no system deps.
-SYNC_URL = (
-    settings.DATABASE_URL.replace("+asyncpg", "+psycopg").replace("+aiosqlite", "+pysqlite")
-)
+SYNC_URL = settings.DATABASE_URL.replace("+asyncpg", "+psycopg").replace("+aiosqlite", "+pysqlite")
 
 config = context.config
 target_metadata = Base.metadata

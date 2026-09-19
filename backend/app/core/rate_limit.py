@@ -1,8 +1,8 @@
 """Fixed-window rate limiting on Redis (spec: Redis for rate-limiting).
 
-Only the ticket-01 public endpoints are limited: signup, login/token, and
-password-reset. Verify/refresh/me are cheap authenticated-or-token reads and
-are deliberately NOT limited.
+Limited: ticket-01 public endpoints (signup, login/token, password-reset)
+plus ticket-02 invite create/accept. Verify/refresh/me are cheap
+authenticated-or-token reads and are deliberately NOT limited.
 Falls back to in-memory when Redis is unreachable (tests / local without
 redis) and logs a warning instead of failing silently.
 Backend messages stay English; the frontend localizes them (default Arabic).
@@ -41,6 +41,8 @@ LIMITED_ENDPOINTS: dict[str, int] = {
     "/api/v1/auth/token": settings.RATE_LIMIT_LOGIN_PER_MIN,
     "/api/v1/auth/password-reset/request": settings.RATE_LIMIT_RESET_PER_MIN,
     "/api/v1/auth/password-reset/confirm": settings.RATE_LIMIT_RESET_PER_MIN,
+    "/api/v1/invites": settings.RATE_LIMIT_INVITE_PER_MIN,
+    "/api/v1/invites/accept": settings.RATE_LIMIT_INVITE_PER_MIN,
 }
 
 

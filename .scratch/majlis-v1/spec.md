@@ -8,7 +8,7 @@ As the sheikh/teacher, I cannot control who joins, who sees which book/course, o
 
 ## Solution
 
-Majlis / مجلس — a private, Arabic-first LMS for a single mosque circle (sellable-ready later):
+Majlis / مجلس — a private LMS with Arabic-first frontend for a single mosque circle (sellable-ready later):
 
 - Private enrollment: teachers invite-only, students self-signup then join courses via temporary codes + teacher approval.
 - Structured content: Course = one book شرح كتاب, Lesson = one recording session + pages range + audio + transcripts stored as DB text.
@@ -73,7 +73,7 @@ Modules and interfaces:
 - RAG core contract: indexing reads transcript TEXT directly from Postgres (never files); chunk ~800 tokens / ~150 overlap, chunk sizes as CONFIG not constants; 1 Qdrant collection per course; chunk metadata lesson_id, course_id, pages range, source_type voice|book. Retrieval/answer callable from CLI or curl; LLM via Groq/OpenRouter, embeddings via Gemini, all through the key vault. Eval script answers 20–30 realistic Arabic questions logging answer + citations; admin manually grades quality — this gate must pass before chat UI starts.
 - Chat contract: per-course UI, citations shown (lesson title + pages), 30 queries/day/student, response caching, graceful “AI busy” error. Prompt enforces Arabic-first, sources-only, refuse otherwise.
 - Key vault: provider/model/encrypted key/weight/active/quota/last_used stored in Postgres encrypted at rest (Fernet), decrypt only in worker memory, rotation by least-recently-used skipping 429/5xx, full usage log with tokens/latency/error, Redis caches rotation pointer for speed. Master encryption key only secret in env; no provider keys in .env ever.
-- API style: async FastAPI, async Postgres access, Alembic migrations, JWT short access + long refresh. Arabic-first error messages where user-facing.
+- API style: async FastAPI, async Postgres access, Alembic migrations, JWT short access + long refresh. Arabic-first in frontend: user-facing error messages are localized in the frontend; backend messages stay English, and backend-sent emails keep Arabic bodies per the ticket-01 pattern.
 - Deployment: Docker Compose services api + postgres + qdrant + redis + reverse-proxy (no worker). Frontend static build via Cloudflare Pages (fallback static via Nginx). Redis is used for rate-limiting, chat cache, and rotation pointer.
 - Backup: scheduled rclone sync R2 → the existing Google Drive archive as disaster recovery (see ADR-0005).
 - Rejected vs blocked semantics: rejected = soft, may re-apply with new code; blocked = per-course ban, cannot rejoin that course; platform ban admin-only.
