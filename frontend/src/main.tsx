@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { createRoot } from "react-dom/client";
 import { LoginPage, ResetPage, SignupPage, VerifyPage } from "./pages/auth";
 import { CoursesPage } from "./pages/courses";
+import { EnrollmentsPage } from "./pages/enrollments";
 import { InviteAcceptPage, InviteCreatePage } from "./pages/invites";
 import { LessonsPage } from "./pages/lessons";
 import { dict, dirFor, type Lang } from "./i18n";
@@ -37,6 +38,7 @@ function App() {
     { key: "invite-accept", label: t.nav_invite_accept },
     ...(token ? [{ key: "courses", label: t.nav_courses }] : []),
     ...(token ? [{ key: "lessons", label: t.nav_lessons }] : []),
+    ...(token ? [{ key: "enroll", label: t.nav_enroll }] : []),
   ];
   return (
     <div dir={dirFor(lang)} lang={lang} style={{ fontFamily: "system-ui" }}>
@@ -56,6 +58,7 @@ function App() {
       {route === "invite-accept" && <InviteAcceptPage lang={lang} />}
       {route === "courses" && <CoursesPage lang={lang} token={token} />}
       {route === "lessons" && <LessonsPage lang={lang} token={token} />}
+      {route === "enroll" && <EnrollmentsPage lang={lang} token={token} />}
     </div>
   );
 }

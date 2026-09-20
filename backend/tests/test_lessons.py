@@ -136,7 +136,7 @@ async def test_transcript_edit_round_trip_and_status_locked(client):
     assert upd.json()["status"] == "pending"
 
 
-async def test_student_can_read_lessons_permissive(client):
+async def test_student_lesson_reads_gated_until_approved(client):
     from app.models.user import Role
 
     await create_user_in_db("lr1@x.com", "password123", role=Role.teacher)
@@ -151,6 +151,22 @@ async def test_student_can_read_lessons_permissive(client):
     )
     lid = created.json()["id"]
     sh = {"Authorization": f"Bearer {s['access_token']}"}
+    th = {"Authorization": f"Bearer {t['access_token']}"}
+    # Ticket 04 gate: lessons stay private until approval.
+    assert (
+        await client.get(f"/api/v1/courses/{course['id']}/lessons", headers=sh)
+    ).status_code == 403
+    assert (await client.get(f"/api/v1/lessons/{lid}", headers=sh)).status_code == 403
+
+    code = await client.post(f"/api/v1/courses/{course['id']}/codes", json={}, headers=th)
+    join = await client.post(
+        "/api/v1/enrollments/join",
+        json={"code": code.json()["code"], "display_name": "S"},
+        headers=sh,
+    )
+    assert (
+        await client.post(f"/api/v1/enrollments/{join.json()['id']}/approve", headers=th)
+    ).status_code == 200
     lst = await client.get(f"/api/v1/courses/{course['id']}/lessons", headers=sh)
     assert lst.status_code == 200, lst.text
     one = await client.get(f"/api/v1/lessons/{lid}", headers=sh)

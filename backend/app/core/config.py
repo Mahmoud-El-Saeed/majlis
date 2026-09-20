@@ -20,7 +20,12 @@ class Settings(BaseSettings):
     RATE_LIMIT_LOGIN_PER_MIN: int = 10
     RATE_LIMIT_RESET_PER_MIN: int = 5
     RATE_LIMIT_INVITE_PER_MIN: int = 10
+    RATE_LIMIT_JOIN_PER_MIN: int = 10
     INVITE_TOKEN_EXPIRE_HOURS: int = 72
+    CODE_DEFAULT_LENGTH: int = 8
+    CODE_DEFAULT_EXPIRE_DAYS: int = 7
+    CODE_DEFAULT_MAX_USES: int = 50
+    CODE_MAX_ACTIVE_PER_COURSE: int = 5
     ADMIN_EMAIL: str | None = None
     ADMIN_PASSWORD: str | None = None
 

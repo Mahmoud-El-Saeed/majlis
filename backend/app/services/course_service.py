@@ -3,8 +3,10 @@ import uuid
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.course import Course
+from app.models.enrollment import EnrollmentStatus
 from app.models.user import Role, User
 from app.repositories.course_repository import course_repository
+from app.repositories.enrollment_repository import enrollment_repository
 from app.repositories.user_repository import user_repository
 from app.schemas.courses import CourseCreateIn, CourseUpdateIn
 
@@ -46,21 +48,48 @@ async def create_course(db: AsyncSession, actor: User, data: CourseCreateIn) -> 
     return await course_repository.save(db, course)
 
 
-async def list_courses(db: AsyncSession) -> list[Course]:
-    return await course_repository.list_all(db)
+async def list_courses(db: AsyncSession, actor: User) -> list[Course]:
+    """Private circle: admin sees all; everyone else sees owned courses plus
+    courses with an approved enrollment. Membership, never role."""
+    if actor.role == Role.admin:
+        return await course_repository.list_all(db)
+    approved_ids = set(await enrollment_repository.approved_course_ids(db, actor.id))
+    all_courses = await course_repository.list_all(db)
+    return [
+        c
+        for c in all_courses
+        if (c.created_by is not None and c.created_by == actor.id) or c.id in approved_ids
+    ]
 
 
-async def get_course(db: AsyncSession, course_id: str) -> Course:
+async def can_view(db: AsyncSession, user: User, course: Course) -> bool:
+    """Course/lesson read gate (ticket 04): admin, owner-teacher, or approved
+    enrollment. Pending/rejected/blocked stay gated out."""
+    if user.role == Role.admin:
+        return True
+    if course.created_by is not None and course.created_by == user.id:
+        return True
+    row = await enrollment_repository.get_by_course_user(db, course.id, user.id)
+    if row is None:
+        return False
+    return row.status == EnrollmentStatus.approved
+
+
+async def get_course(db: AsyncSession, actor: User, course_id: str) -> Course:
     course = await course_repository.get_by_id(db, course_id)
     if course is None:
         raise CourseNotFound("Course not found.")
+    if not await can_view(db, actor, course):
+        raise CourseForbidden("Not authorized.")
     return course
 
 
 async def update_course(
     db: AsyncSession, actor: User, course_id: str, data: CourseUpdateIn
 ) -> Course:
-    course = await get_course(db, course_id)
+    course = await course_repository.get_by_id(db, course_id)
+    if course is None:
+        raise CourseNotFound("Course not found.")
     if not can_write(actor, course):
         raise CourseForbidden("Not authorized.")
     if data.title is not None:
@@ -77,7 +106,9 @@ async def update_course(
 
 
 async def delete_course(db: AsyncSession, actor: User, course_id: str) -> None:
-    course = await get_course(db, course_id)
+    course = await course_repository.get_by_id(db, course_id)
+    if course is None:
+        raise CourseNotFound("Course not found.")
     if not can_write(actor, course):
         raise CourseForbidden("Not authorized.")
     await course_repository.delete(db, course)

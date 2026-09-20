@@ -51,7 +51,7 @@ async def test_anon_cannot_create_course(client):
     assert r.status_code in (401, 403), r.text
 
 
-async def test_course_read_permissive_for_student(client):
+async def test_course_read_gated_until_approved(client):
     from app.models.user import Role
 
     await create_user_in_db("tc@x.com", "password123", role=Role.teacher)
@@ -64,11 +64,30 @@ async def test_course_read_permissive_for_student(client):
     cid = created.json()["id"]
 
     sh = {"Authorization": f"Bearer {st['access_token']}"}
+    # Ticket 04 gate: non-members see no courses and get 403 on detail.
     lst = await client.get("/api/v1/courses", headers=sh)
     assert lst.status_code == 200, lst.text
-    assert any(c["id"] == cid for c in lst.json())
+    assert all(c["id"] != cid for c in lst.json())
     one = await client.get(f"/api/v1/courses/{cid}", headers=sh)
-    assert one.status_code == 200, one.text
+    assert one.status_code == 403, one.text
+
+    # After join + approve the course becomes visible.
+    code = await client.post(f"/api/v1/courses/{cid}/codes", json={}, headers=h)
+    assert code.status_code == 201, code.text
+    join = await client.post(
+        "/api/v1/enrollments/join",
+        json={"code": code.json()["code"], "display_name": "S"},
+        headers=sh,
+    )
+    assert join.status_code == 201, join.text
+    eid = join.json()["id"]
+    assert (
+        await client.post(f"/api/v1/enrollments/{eid}/approve", headers=h)
+    ).status_code == 200
+    lst2 = await client.get("/api/v1/courses", headers=sh)
+    assert any(c["id"] == cid for c in lst2.json())
+    one2 = await client.get(f"/api/v1/courses/{cid}", headers=sh)
+    assert one2.status_code == 200, one2.text
 
 
 async def test_owner_teacher_can_edit_own_but_other_teacher_forbidden(client):

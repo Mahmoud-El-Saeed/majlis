@@ -31,21 +31,24 @@ async def create_lesson(
 
 
 @router.get("/courses/{course_id}/lessons", response_model=list[LessonOut])
-async def list_lessons(db: DbDep, _user: CurrentUserDep, course_id: str) -> list[LessonOut]:
-    # Permissive reads until ticket 04 wires the approved-enrollment gate.
+async def list_lessons(db: DbDep, user: CurrentUserDep, course_id: str) -> list[LessonOut]:
     try:
-        lessons = await lesson_service.list_lessons(db, course_id)
+        lessons = await lesson_service.list_lessons(db, user, course_id)
     except CourseNotFound as e:
         raise HTTPException(status_code=404, detail=e.message) from None
+    except (LessonForbidden, CourseForbidden) as e:
+        raise HTTPException(status_code=403, detail=e.message) from None
     return [to_lesson_out(lesson) for lesson in lessons]
 
 
 @router.get("/lessons/{lesson_id}", response_model=LessonOut)
-async def get_lesson(db: DbDep, _user: CurrentUserDep, lesson_id: str) -> LessonOut:
+async def get_lesson(db: DbDep, user: CurrentUserDep, lesson_id: str) -> LessonOut:
     try:
-        lesson = await lesson_service.get_lesson(db, lesson_id)
+        lesson = await lesson_service.get_lesson(db, user, lesson_id)
     except LessonNotFound as e:
         raise HTTPException(status_code=404, detail=e.message) from None
+    except (LessonForbidden, CourseForbidden) as e:
+        raise HTTPException(status_code=403, detail=e.message) from None
     return to_lesson_out(lesson)
 
 

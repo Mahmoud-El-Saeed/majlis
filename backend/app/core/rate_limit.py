@@ -43,6 +43,7 @@ LIMITED_ENDPOINTS: dict[str, int] = {
     "/api/v1/auth/password-reset/confirm": settings.RATE_LIMIT_RESET_PER_MIN,
     "/api/v1/invites": settings.RATE_LIMIT_INVITE_PER_MIN,
     "/api/v1/invites/accept": settings.RATE_LIMIT_INVITE_PER_MIN,
+    "/api/v1/enrollments/join": settings.RATE_LIMIT_JOIN_PER_MIN,
 }
 
 

@@ -23,18 +23,19 @@ async def create_course(db: DbDep, actor: TeacherWriteDep, data: CourseCreateIn)
 
 
 @router.get("", response_model=list[CourseOut])
-async def list_courses(db: DbDep, _user: CurrentUserDep) -> list[CourseOut]:
-    # Permissive reads until ticket 04 wires the approved-enrollment gate.
-    courses = await course_service.list_courses(db)
+async def list_courses(db: DbDep, user: CurrentUserDep) -> list[CourseOut]:
+    courses = await course_service.list_courses(db, user)
     return [to_course_out(c) for c in courses]
 
 
 @router.get("/{course_id}", response_model=CourseOut)
-async def get_course(db: DbDep, _user: CurrentUserDep, course_id: str) -> CourseOut:
+async def get_course(db: DbDep, user: CurrentUserDep, course_id: str) -> CourseOut:
     try:
-        course = await course_service.get_course(db, course_id)
+        course = await course_service.get_course(db, user, course_id)
     except CourseNotFound as e:
         raise HTTPException(status_code=404, detail=e.message) from None
+    except CourseForbidden as e:
+        raise HTTPException(status_code=403, detail=e.message) from None
     return to_course_out(course)
 
 

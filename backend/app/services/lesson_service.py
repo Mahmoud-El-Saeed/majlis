@@ -6,7 +6,7 @@ from app.models.user import User
 from app.repositories.course_repository import course_repository
 from app.repositories.lesson_repository import lesson_repository
 from app.schemas.lessons import LessonCreateIn, LessonUpdateIn
-from app.services.course_service import CourseNotFound, can_write
+from app.services.course_service import CourseNotFound, can_view, can_write
 
 
 class LessonError(Exception):
@@ -61,12 +61,26 @@ async def create_lesson(
     return await lesson_repository.save(db, lesson)
 
 
-async def list_lessons(db: AsyncSession, course_id: str) -> list[Lesson]:
+async def list_lessons(db: AsyncSession, actor: User, course_id: str) -> list[Lesson]:
     course = await _course_or_404(db, course_id)
+    if not await can_view(db, actor, course):
+        raise LessonForbidden("Not authorized.")
     return await lesson_repository.list_for_course(db, course.id)
 
 
-async def get_lesson(db: AsyncSession, lesson_id: str) -> Lesson:
+async def get_lesson(db: AsyncSession, actor: User, lesson_id: str) -> Lesson:
+    lesson = await lesson_repository.get_by_id(db, lesson_id)
+    if lesson is None:
+        raise LessonNotFound("Lesson not found.")
+    course = await course_repository.get_by_id(db, str(lesson.course_id))
+    if course is None:
+        raise CourseNotFound("Course not found.")
+    if not await can_view(db, actor, course):
+        raise LessonForbidden("Not authorized.")
+    return lesson
+
+
+async def _lesson_or_404(db: AsyncSession, lesson_id: str) -> Lesson:
     lesson = await lesson_repository.get_by_id(db, lesson_id)
     if lesson is None:
         raise LessonNotFound("Lesson not found.")
@@ -76,7 +90,7 @@ async def get_lesson(db: AsyncSession, lesson_id: str) -> Lesson:
 async def update_lesson(
     db: AsyncSession, actor: User, lesson_id: str, data: LessonUpdateIn
 ) -> Lesson:
-    lesson = await get_lesson(db, lesson_id)
+    lesson = await _lesson_or_404(db, lesson_id)
     course = await course_repository.get_by_id(db, str(lesson.course_id))
     if course is None:
         raise CourseNotFound("Course not found.")
@@ -107,7 +121,7 @@ async def update_lesson(
 
 
 async def delete_lesson(db: AsyncSession, actor: User, lesson_id: str) -> None:
-    lesson = await get_lesson(db, lesson_id)
+    lesson = await _lesson_or_404(db, lesson_id)
     course = await course_repository.get_by_id(db, str(lesson.course_id))
     if course is None:
         raise CourseNotFound("Course not found.")
