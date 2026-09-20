@@ -25,6 +25,13 @@ Single-context repo. Use these terms exactly as defined; do not drift to synonym
 - **Rejected:** soft refusal; student may re-apply with a (new) code.
 - **Blocked:** per-course ban; student cannot rejoin that course. Platform ban is admin-only and separate.
 
+## Role & enrollment (capability vs trust)
+
+- **Role is a capability level, not a partition:** one account per person; `role` is the account's highest capability (`admin > teacher > student`). Admin passes every gate.
+- **Promotion, never duplication:** inviting an already-registered student email upgrades that same account to `teacher` on accept. Enrollments, attempts, and grades are untouched.
+- **Enrollment is per-course trust, independent of role:** joining always goes through code + teacher approval, even for teachers. A teacher gains no automatic access to another teacher's course. Membership gates check enrollment status, never `role == "student"`.
+- **Bans keep their scope:** per-course `blocked` survives promotion; platform ban (`is_active=False`) blocks invite acceptance.
+
 ## Assessment
 
 - **Exam:** belongs to a course, optionally to one lesson (null lesson = general/book-wide). Config: attempts, duration, open/close window, pass score, show-result mode (immediate vs after-publish).

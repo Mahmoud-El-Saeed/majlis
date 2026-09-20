@@ -77,6 +77,7 @@ Modules and interfaces:
 - Deployment: Docker Compose services api + postgres + qdrant + redis + reverse-proxy (no worker). Frontend static build via Cloudflare Pages (fallback static via Nginx). Redis is used for rate-limiting, chat cache, and rotation pointer.
 - Backup: scheduled rclone sync R2 → the existing Google Drive archive as disaster recovery (see ADR-0005).
 - Rejected vs blocked semantics: rejected = soft, may re-apply with new code; blocked = per-course ban, cannot rejoin that course; platform ban admin-only.
+- Role/enrollment split: role grants capabilities platform-wide; enrollment grants trust per course. Inviting an existing student promotes that account to teacher (history preserved); any verified user may join any course via code + approval, including teachers studying with other teachers.
 - Lesson upload in V1 admin-only; teacher-upload is V2 to bound scope.
 
 Technical clarifications:

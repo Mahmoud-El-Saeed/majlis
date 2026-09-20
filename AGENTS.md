@@ -16,3 +16,14 @@ Single-context layout with root `CONTEXT.md` + `docs/adr/`. See `docs/agents/dom
 
 - Backend work: before writing any FastAPI code, load the `fastapi-templates` skill (scaffolding and patterns source of truth) and the `fastapi` skill (official correctness reference) via the Skill tool, and follow them for the whole session.
 - Stack pins and behavior contracts live in `.scratch/majlis-v1/spec.md`; domain terms in `CONTEXT.md`; decisions in `docs/adr/`.
+
+## Standing rules (every ticket)
+
+- Fixed vocabularies are Postgres native enums, not strings.
+- Tests run on Postgres (`majlis_test`), never SQLite; isolate per test.
+- Migrations, every time: models → `autogenerate` → read → fix → `upgrade head` → test. Hand-fix PG ENUM alters; prove reversibility.
+- Migrations stay sync, app code async; never block the event loop.
+- Arabic-first in frontend (`i18n.ts`); backend messages English; backend emails Arabic.
+- Role is a capability level: enrollment checks membership, never `role == "student"`; inviting a student promotes.
+- TDD at seams; `ty` + single files during, full suite at end; `/code-review`, then fix findings.
+- Never commit without an explicit instruction.
