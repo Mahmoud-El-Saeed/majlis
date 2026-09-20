@@ -1,0 +1,166 @@
+import { useEffect, useState } from "react";
+import { lessonsApi, type Lesson } from "../../api/lessons";
+import { Notice, Page, TextArea, TextField } from "../../components/ui";
+import { dict, tError, type Lang, type UIText } from "../../i18n";
+
+/** Lesson feature forms (architecture §4 features/). Pages stay thin shells. */
+
+function useMessage(lang: Lang) {
+  const [msg, setMsg] = useState("");
+  const show = (m: string) => setMsg(m);
+  const showError = (err: unknown, t: UIText) =>
+    setMsg(err instanceof Error ? tError(lang, err.message) : t.generic_error);
+  return { msg, show, showError };
+}
+
+export function LessonList({ lang, token, courseId }: { lang: Lang; token: string; courseId: string }) {
+  const t = dict[lang];
+  const [lessons, setLessons] = useState<Lesson[]>([]);
+  const { msg, showError } = useMessage(lang);
+  useEffect(() => {
+    if (!token || !courseId) return;
+    lessonsApi
+      .list(token, courseId)
+      .then(setLessons)
+      .catch((err) => showError(err, t));
+  }, [token, courseId]);
+  if (!token) return null;
+  return (
+    <Page title={t.lessons_title}>
+      <ul>
+        {lessons.map((l) => (
+          <li key={l.id}>
+            {l.title} {l.pages_from ?? ""}–{l.pages_to ?? ""} [{l.status}]
+          </li>
+        ))}
+      </ul>
+      {msg ? <Notice message={msg} /> : null}
+    </Page>
+  );
+}
+
+export function LessonCreateForm({
+  lang,
+  token,
+  courseId,
+}: {
+  lang: Lang;
+  token: string;
+  courseId: string;
+}) {
+  const t = dict[lang];
+  const [title, setTitle] = useState("");
+  const [pagesFrom, setPagesFrom] = useState("");
+  const [pagesTo, setPagesTo] = useState("");
+  const [lessonDate, setLessonDate] = useState("");
+  const [audioKey, setAudioKey] = useState("");
+  const [voice, setVoice] = useState("");
+  const [book, setBook] = useState("");
+  const { msg, show, showError } = useMessage(lang);
+  if (!token) {
+    return (
+      <Page title={t.lesson_create_title}>
+        <Notice message={t.login_required} />
+      </Page>
+    );
+  }
+  return (
+    <Page title={t.lesson_create_title}>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          show("");
+          lessonsApi
+            .create(token, courseId, {
+              title,
+              lesson_date: lessonDate || undefined,
+              pages_from: pagesFrom ? Number(pagesFrom) : undefined,
+              pages_to: pagesTo ? Number(pagesTo) : undefined,
+              audio_key: audioKey || undefined,
+              transcript_voice: voice || undefined,
+              transcript_book: book || undefined,
+            })
+            .then(() => show(t.lesson_create_success))
+            .catch((err) => showError(err, t));
+        }}
+      >
+        <TextField label={t.lesson_title} value={title} onChange={(e) => setTitle(e.target.value)} required />
+        <TextField
+          label={t.lesson_pages_from}
+          value={pagesFrom}
+          onChange={(e) => setPagesFrom(e.target.value)}
+          type="number"
+          min={1}
+        />
+        <TextField
+          label={t.lesson_pages_to}
+          value={pagesTo}
+          onChange={(e) => setPagesTo(e.target.value)}
+          type="number"
+          min={1}
+        />
+        <TextField
+          label={t.lesson_date}
+          value={lessonDate}
+          onChange={(e) => setLessonDate(e.target.value)}
+          type="date"
+        />
+        <TextField
+          label={t.lesson_audio}
+          value={audioKey}
+          onChange={(e) => setAudioKey(e.target.value)}
+        />
+        <TextArea label={t.lesson_voice} value={voice} onChange={(e) => setVoice(e.target.value)} />
+        <TextArea label={t.lesson_book} value={book} onChange={(e) => setBook(e.target.value)} />
+        <button type="submit">{t.lesson_submit}</button>
+      </form>
+      <Notice message={msg} />
+    </Page>
+  );
+}
+
+export function LessonEditForm({ lang, token }: { lang: Lang; token: string }) {
+  const t = dict[lang];
+  const [lessonId, setLessonId] = useState("");
+  const [title, setTitle] = useState("");
+  const [voice, setVoice] = useState("");
+  const [book, setBook] = useState("");
+  const { msg, show, showError } = useMessage(lang);
+  if (!token) {
+    return (
+      <Page title={t.lesson_edit_title}>
+        <Notice message={t.login_required} />
+      </Page>
+    );
+  }
+  return (
+    <Page title={t.lesson_edit_title}>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          show("");
+          lessonsApi
+            .update(token, lessonId, {
+              title: title || undefined,
+              transcript_voice: voice || undefined,
+              transcript_book: book || undefined,
+            })
+            .then(() => show(t.lesson_edit_success))
+            .catch((err) => showError(err, t));
+        }}
+      >
+        <TextField
+          label={t.lesson_id}
+          value={lessonId}
+          onChange={(e) => setLessonId(e.target.value)}
+          required
+        />
+        <TextField label={t.lesson_title} value={title} onChange={(e) => setTitle(e.target.value)} />
+        <TextArea label={t.lesson_voice} value={voice} onChange={(e) => setVoice(e.target.value)} />
+        <TextArea label={t.lesson_book} value={book} onChange={(e) => setBook(e.target.value)} />
+        <button type="submit">{t.lesson_edit_submit}</button>
+      </form>
+      <Notice message={msg} />
+    </Page>
+  );
+}

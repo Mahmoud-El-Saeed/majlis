@@ -9,6 +9,8 @@ from sqlalchemy.engine import create_engine
 from alembic import context
 from app.core.config import get_settings
 from app.core.database import Base
+from app.models import course as _course  # noqa: F401
+from app.models import lesson as _lesson  # noqa: F401
 from app.models import teacher_invite as _teacher_invite  # noqa: F401
 from app.models import user as _user  # noqa: F401
 

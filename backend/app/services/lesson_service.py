@@ -1,0 +1,116 @@
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.models.course import Course
+from app.models.lesson import Lesson, LessonMediaType
+from app.models.user import User
+from app.repositories.course_repository import course_repository
+from app.repositories.lesson_repository import lesson_repository
+from app.schemas.lessons import LessonCreateIn, LessonUpdateIn
+from app.services.course_service import CourseNotFound, can_write
+
+
+class LessonError(Exception):
+    def __init__(self, message: str):
+        self.message = message
+
+
+class LessonNotFound(LessonError):
+    pass
+
+
+class LessonForbidden(LessonError):
+    pass
+
+
+async def _course_or_404(db: AsyncSession, course_id: str) -> Course:
+    course = await course_repository.get_by_id(db, course_id)
+    if course is None:
+        raise CourseNotFound("Course not found.")
+    return course
+
+
+def _check_media_type(value: str | None) -> None:
+    if value is not None and value != LessonMediaType.audio.value:
+        raise LessonError("Only audio lessons are supported in V1.")
+
+
+def _check_pages(pages_from: int | None, pages_to: int | None) -> None:
+    if pages_from is not None and pages_to is not None and pages_from > pages_to:
+        raise LessonError("pages_from must be <= pages_to.")
+
+
+async def create_lesson(
+    db: AsyncSession, actor: User, course_id: str, data: LessonCreateIn
+) -> Lesson:
+    course = await _course_or_404(db, course_id)
+    if not can_write(actor, course):
+        raise LessonForbidden("Not authorized.")
+    _check_media_type(data.media_type)
+    _check_pages(data.pages_from, data.pages_to)
+    lesson = Lesson(
+        course_id=course.id,
+        title=data.title.strip(),
+        lesson_date=data.lesson_date,
+        pages_from=data.pages_from,
+        pages_to=data.pages_to,
+        audio_key=data.audio_key,
+        media_type=LessonMediaType.audio,
+        transcript_voice=data.transcript_voice or "",
+        transcript_book=data.transcript_book or "",
+    )
+    return await lesson_repository.save(db, lesson)
+
+
+async def list_lessons(db: AsyncSession, course_id: str) -> list[Lesson]:
+    course = await _course_or_404(db, course_id)
+    return await lesson_repository.list_for_course(db, course.id)
+
+
+async def get_lesson(db: AsyncSession, lesson_id: str) -> Lesson:
+    lesson = await lesson_repository.get_by_id(db, lesson_id)
+    if lesson is None:
+        raise LessonNotFound("Lesson not found.")
+    return lesson
+
+
+async def update_lesson(
+    db: AsyncSession, actor: User, lesson_id: str, data: LessonUpdateIn
+) -> Lesson:
+    lesson = await get_lesson(db, lesson_id)
+    course = await course_repository.get_by_id(db, str(lesson.course_id))
+    if course is None:
+        raise CourseNotFound("Course not found.")
+    if not can_write(actor, course):
+        raise LessonForbidden("Not authorized.")
+    _check_media_type(data.media_type)
+    # Partial-update pages guard: compare the merged range, not just payload.
+    merged_from = data.pages_from if data.pages_from is not None else lesson.pages_from
+    merged_to = data.pages_to if data.pages_to is not None else lesson.pages_to
+    _check_pages(merged_from, merged_to)
+    if data.title is not None:
+        lesson.title = data.title.strip()
+    if data.lesson_date is not None:
+        lesson.lesson_date = data.lesson_date
+    if data.pages_from is not None:
+        lesson.pages_from = data.pages_from
+    if data.pages_to is not None:
+        lesson.pages_to = data.pages_to
+    if data.audio_key is not None:
+        lesson.audio_key = data.audio_key
+    if data.transcript_voice is not None:
+        lesson.transcript_voice = data.transcript_voice
+    if data.transcript_book is not None:
+        lesson.transcript_book = data.transcript_book
+    await db.flush()
+    await db.refresh(lesson)
+    return lesson
+
+
+async def delete_lesson(db: AsyncSession, actor: User, lesson_id: str) -> None:
+    lesson = await get_lesson(db, lesson_id)
+    course = await course_repository.get_by_id(db, str(lesson.course_id))
+    if course is None:
+        raise CourseNotFound("Course not found.")
+    if not can_write(actor, course):
+        raise LessonForbidden("Not authorized.")
+    await lesson_repository.delete(db, lesson)

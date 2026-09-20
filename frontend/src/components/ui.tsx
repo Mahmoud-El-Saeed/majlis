@@ -27,3 +27,15 @@ export function Notice({ message }: { message: string }) {
   if (!message) return null;
   return <p>{message}</p>;
 }
+
+export function TextArea({
+  label,
+  ...props
+}: React.TextareaHTMLAttributes<HTMLTextAreaElement> & { label: string }) {
+  return (
+    <label style={{ display: "block", marginBottom: 8 }}>
+      {label}
+      <textarea {...props} rows={6} style={{ display: "block", width: "100%", marginTop: 4 }} />
+    </label>
+  );
+}
