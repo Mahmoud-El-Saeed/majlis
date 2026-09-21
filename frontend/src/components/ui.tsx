@@ -1,10 +1,10 @@
 import type { ReactNode } from "react";
 
-/** Shared RTL UI primitives (architecture §4 components/). */
+/** Shared RTL UI primitives (architecture §4 components/). Styling lives in styles.css. */
 
 export function Page({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <main style={{ maxWidth: 420, margin: "2rem auto", padding: 16 }}>
+    <main className="majlis-page">
       <h1>{title}</h1>
       {children}
     </main>
@@ -16,16 +16,16 @@ export function TextField({
   ...props
 }: React.InputHTMLAttributes<HTMLInputElement> & { label: string }) {
   return (
-    <label style={{ display: "block", marginBottom: 8 }}>
+    <label className="field">
       {label}
-      <input {...props} style={{ display: "block", width: "100%", marginTop: 4 }} />
+      <input {...props} />
     </label>
   );
 }
 
 export function Notice({ message }: { message: string }) {
   if (!message) return null;
-  return <p>{message}</p>;
+  return <p className="notice">{message}</p>;
 }
 
 export function TextArea({
@@ -33,9 +33,9 @@ export function TextArea({
   ...props
 }: React.TextareaHTMLAttributes<HTMLTextAreaElement> & { label: string }) {
   return (
-    <label style={{ display: "block", marginBottom: 8 }}>
+    <label className="field">
       {label}
-      <textarea {...props} rows={6} style={{ display: "block", width: "100%", marginTop: 4 }} />
+      <textarea {...props} rows={6} />
     </label>
   );
 }

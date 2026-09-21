@@ -45,7 +45,7 @@ async def confirm_upload(
         lesson = await storage_service.confirm_upload(db, user, lesson_id, data.object_key, storage)
     except (StorageError, CourseNotFound, CourseForbidden) as e:
         raise HTTPException(status_code=_media_error_status(e), detail=e.message) from None
-    return to_lesson_out(lesson)
+    return to_lesson_out(lesson, can_manage=True)
 
 
 @router.get("/lessons/{lesson_id}/play", response_model=PlayOut)

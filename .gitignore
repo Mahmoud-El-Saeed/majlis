@@ -34,3 +34,6 @@ Thumbs.db
 # Local agent tooling (never commit local skills/plugins)
 .agents/
 .opencode/
+
+# playwright test artifacts
+.playwright-mcp/

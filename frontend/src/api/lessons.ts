@@ -10,6 +10,22 @@ export interface Lesson {
   transcript_voice: string;
   transcript_book: string;
   status: string;
+  /** Server-computed: True for admin/owner-teacher. Never infer from blanked fields. */
+  can_manage: boolean;
+  created_at: string;
+}
+
+/** Lightweight list item (ticket 06): no transcripts, no audio_key. */
+export interface LessonSummary {
+  id: string;
+  course_id: string;
+  title: string;
+  lesson_date: string | null;
+  pages_from: number | null;
+  pages_to: number | null;
+  media_type: string;
+  status: string;
+  attachment_count: number;
   created_at: string;
 }
 
@@ -47,8 +63,8 @@ async function req<T>(path: string, token: string, init?: RequestInit): Promise<
 }
 
 export const lessonsApi = {
-  list: (token: string, courseId: string): Promise<Lesson[]> =>
-    req<Lesson[]>(`/courses/${courseId}/lessons`, token),
+  list: (token: string, courseId: string): Promise<LessonSummary[]> =>
+    req<LessonSummary[]>(`/courses/${courseId}/lessons`, token),
   get: (token: string, id: string): Promise<Lesson> => req<Lesson>(`/lessons/${id}`, token),
   create: (
     token: string,

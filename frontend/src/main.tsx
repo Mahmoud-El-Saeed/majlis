@@ -1,70 +1,105 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
+import { BrowserRouter, Link, Navigate, Route, Routes, useNavigate } from "react-router-dom";
+import { authApi } from "./api/auth";
 import { LoginPage, ResetPage, SignupPage, VerifyPage } from "./pages/auth";
 import { CoursesPage } from "./pages/courses";
+import { CourseDetailPage } from "./pages/course-detail";
+import { DashboardPage } from "./pages/dashboard";
 import { EnrollmentsPage } from "./pages/enrollments";
 import { InviteAcceptPage, InviteCreatePage } from "./pages/invites";
+import { LessonDetailPage } from "./pages/lesson-detail";
 import { LessonsPage } from "./pages/lessons";
 import { dict, dirFor, type Lang } from "./i18n";
+import "./styles.css";
 
-function App() {
-  // Emailed links (/verify, /reset, /invite + ?token=) boot onto the right
-  // form instead of always landing on signup.
-  const [route, setRoute] = useState(() => {
-    const p = window.location.pathname.replace(/\/$/, "");
-    if (p.endsWith("/invite")) return "invite-accept";
-    if (p.endsWith("/verify")) return "verify";
-    if (p.endsWith("/reset")) return "reset";
-    if (p.endsWith("/login")) return "login";
-    if (p.endsWith("/signup")) return "signup";
-    return "signup";
-  });
+function Shell() {
   const [token, setToken] = useState(() => localStorage.getItem("majlis_token") ?? "");
+  const [role, setRole] = useState<string | null>(null);
+  const [lang, setLang] = useState<Lang>("ar");
+  const t = dict[lang];
+  const navigate = useNavigate();
   const handleToken = (next: string) => {
     setToken(next);
     localStorage.setItem("majlis_token", next);
+    if (next) navigate("/dashboard");
   };
-  // Default language is Arabic; toggle switches to English and back.
-  const [lang, setLang] = useState<Lang>("ar");
-  const t = dict[lang];
-  // Admin-only invite creation is advertised only once logged in; the
-  // teacher accept form stays public (teachers arrive logged-out via email).
-  const navItems: Array<{ key: string; label: string }> = [
-    { key: "signup", label: t.nav_signup },
-    { key: "login", label: t.nav_login },
-    { key: "verify", label: t.nav_verify },
-    { key: "reset", label: t.nav_reset },
-    ...(token ? [{ key: "invite-create", label: t.nav_invite_create }] : []),
-    { key: "invite-accept", label: t.nav_invite_accept },
-    ...(token ? [{ key: "courses", label: t.nav_courses }] : []),
-    ...(token ? [{ key: "lessons", label: t.nav_lessons }] : []),
-    ...(token ? [{ key: "enroll", label: t.nav_enroll }] : []),
-  ];
+  const logout = () => {
+    setToken("");
+    setRole(null);
+    localStorage.removeItem("majlis_token");
+    navigate("/login");
+  };
+  // Role-aware nav: invite creation is admin-only server-side, so the link
+  // is advertised only to admins instead of 403ing everyone else.
+  useEffect(() => {
+    if (!token) {
+      setRole(null);
+      return;
+    }
+    authApi
+      .me(token)
+      .then((me) => setRole(me.role))
+      .catch(() => setRole(null));
+  }, [token]);
   return (
-    <div dir={dirFor(lang)} lang={lang} style={{ fontFamily: "system-ui" }}>
-      <nav style={{ display: "flex", gap: 12, padding: 16 }}>
-        {navItems.map((item) => (
-          <button key={item.key} onClick={() => setRoute(item.key)}>
-            {item.label}
-          </button>
-        ))}
-        <button onClick={() => setLang(lang === "ar" ? "en" : "ar")}>{t.language_toggle}</button>
+    <div dir={dirFor(lang)} lang={lang}>
+      <nav className="majlis-nav">
+        {!token ? (
+          <>
+            <Link to="/signup">{t.nav_signup}</Link>
+            <Link to="/login">{t.nav_login}</Link>
+            <Link to="/verify">{t.nav_verify}</Link>
+            <Link to="/reset">{t.nav_reset}</Link>
+            <Link to="/invite">{t.nav_invite_accept}</Link>
+          </>
+        ) : (
+          <>
+            <Link to="/dashboard">{t.nav_dashboard}</Link>
+            <Link to="/courses">{t.nav_courses}</Link>
+            <Link to="/lessons">{t.nav_lessons}</Link>
+            <Link to="/enroll">{t.nav_enroll}</Link>
+            {role === "admin" ? (
+              <Link to="/invite-create">{t.nav_invite_create}</Link>
+            ) : null}
+            <button type="button" onClick={logout}>
+              {t.nav_logout}
+            </button>
+          </>
+        )}
+        <button type="button" onClick={() => setLang(lang === "ar" ? "en" : "ar")}>
+          {t.language_toggle}
+        </button>
       </nav>
-      {route === "signup" && <SignupPage lang={lang} />}
-      {route === "login" && <LoginPage lang={lang} onToken={handleToken} />}
-      {route === "verify" && <VerifyPage lang={lang} />}
-      {route === "reset" && <ResetPage lang={lang} />}
-      {route === "invite-create" && <InviteCreatePage lang={lang} token={token} />}
-      {route === "invite-accept" && <InviteAcceptPage lang={lang} />}
-      {route === "courses" && <CoursesPage lang={lang} token={token} />}
-      {route === "lessons" && <LessonsPage lang={lang} token={token} />}
-      {route === "enroll" && <EnrollmentsPage lang={lang} token={token} />}
+      <div className="majlis-main">
+        <Routes>
+          <Route path="/signup" element={<SignupPage lang={lang} />} />
+          <Route path="/login" element={<LoginPage lang={lang} onToken={handleToken} />} />
+          <Route path="/verify" element={<VerifyPage lang={lang} />} />
+          <Route path="/reset" element={<ResetPage lang={lang} />} />
+          <Route path="/invite" element={<InviteAcceptPage lang={lang} />} />
+          <Route path="/dashboard" element={<DashboardPage lang={lang} token={token} />} />
+          <Route path="/courses" element={<CoursesPage lang={lang} token={token} />} />
+          <Route path="/courses/:id" element={<CourseDetailPage lang={lang} token={token} />} />
+          <Route path="/lessons" element={<LessonsPage lang={lang} token={token} />} />
+          <Route path="/lessons/:id" element={<LessonDetailPage lang={lang} token={token} />} />
+          <Route path="/enroll" element={<EnrollmentsPage lang={lang} token={token} />} />
+          <Route
+            path="/invite-create"
+            element={<InviteCreatePage lang={lang} token={token} />}
+          />
+          <Route path="/" element={<Navigate to={token ? "/dashboard" : "/signup"} replace />} />
+          <Route path="*" element={<Navigate to={token ? "/dashboard" : "/signup"} replace />} />
+        </Routes>
+      </div>
     </div>
   );
 }
 
 createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <App />
+    <BrowserRouter>
+      <Shell />
+    </BrowserRouter>
   </React.StrictMode>,
 );

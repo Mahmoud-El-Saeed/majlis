@@ -19,6 +19,13 @@ class CourseRepository:
         result = await db.execute(select(Course).order_by(Course.created_at.desc()))
         return list(result.scalars().all())
 
+    async def list_by_ids(self, db: AsyncSession, course_ids: list[uuid.UUID]) -> list[Course]:
+        """Batched fetch for dashboard pending rows (one query, not N)."""
+        if not course_ids:
+            return []
+        result = await db.execute(select(Course).where(Course.id.in_(course_ids)))
+        return list(result.scalars().all())
+
     async def save(self, db: AsyncSession, course: Course) -> Course:
         db.add(course)
         await db.flush()

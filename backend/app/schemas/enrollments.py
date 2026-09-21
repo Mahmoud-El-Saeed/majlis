@@ -1,7 +1,8 @@
 from datetime import datetime
-from enum import Enum
 
 from pydantic import BaseModel, Field
+
+from app.schemas.common import enum_str
 
 
 class JoinIn(BaseModel):
@@ -32,8 +33,7 @@ class EnrollmentListOut(BaseModel):
 
 
 def to_enrollment_out(row, course_title: str | None = None) -> EnrollmentOut:  # type: ignore[no-untyped-def]
-    st = row.status
-    st = st.value if isinstance(st, Enum) else str(st)
+    st = enum_str(row.status)
     return EnrollmentOut(
         id=str(row.id),
         course_id=str(row.course_id),

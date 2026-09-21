@@ -22,7 +22,13 @@ class StorageClient(Protocol):
 
     async def object_exists(self, key: str) -> bool: ...
 
-    async def presign_get(self, key: str, expires_in: int) -> dict: ...
+    async def presign_get(
+        self,
+        key: str,
+        expires_in: int,
+        filename: str | None = None,
+        disposition: str | None = None,
+    ) -> dict: ...
 
 
 class Aioboto3StorageClient:
@@ -56,11 +62,25 @@ class Aioboto3StorageClient:
                 return False
             raise
 
-    async def presign_get(self, key: str, expires_in: int) -> dict:
+    async def presign_get(
+        self,
+        key: str,
+        expires_in: int,
+        filename: str | None = None,
+        disposition: str | None = None,
+    ) -> dict:
         s3 = self._s3
+        params: dict = {"Bucket": self._bucket, "Key": key}
+        # Inline = view in browser; attachment = download. Both stream
+        # browser -> R2 directly with Range support (ADR-0004).
+        if disposition in ("inline", "attachment"):
+            safe = (filename or key.rsplit("/", 1)[-1]).replace('"', "")
+            params["ResponseContentDisposition"] = f'{disposition}; filename="{safe}"'
+            if key.lower().endswith(".pdf"):
+                params["ResponseContentType"] = "application/pdf"
         url = await s3.generate_presigned_url(  # type: ignore[misc]
             ClientMethod="get_object",
-            Params={"Bucket": self._bucket, "Key": key},
+            Params=params,
             ExpiresIn=expires_in,
         )
         return {"playback_url": url, "expires_in": expires_in}

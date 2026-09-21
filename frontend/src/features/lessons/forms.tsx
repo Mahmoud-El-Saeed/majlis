@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { MAX_AUDIO_MB, lessonsApi, type Lesson } from "../../api/lessons";
+import { MAX_AUDIO_MB, lessonsApi, type Lesson, type LessonSummary } from "../../api/lessons";
 import { Notice, Page, TextArea, TextField } from "../../components/ui";
 import { dict, tError, type Lang, type UIText } from "../../i18n";
 
@@ -13,9 +13,9 @@ function useMessage(lang: Lang) {
   return { msg, show, showError };
 }
 
-export function LessonList({ lang, token, courseId }: { lang: Lang; token: string; courseId: string }) {
+export function LessonList({ lang, token, courseId, refreshKey = 0 }: { lang: Lang; token: string; courseId: string; refreshKey?: number }) {
   const t = dict[lang];
-  const [lessons, setLessons] = useState<Lesson[]>([]);
+  const [lessons, setLessons] = useState<LessonSummary[]>([]);
   const { msg, showError } = useMessage(lang);
   useEffect(() => {
     if (!token || !courseId) return;
@@ -23,7 +23,7 @@ export function LessonList({ lang, token, courseId }: { lang: Lang; token: strin
       .list(token, courseId)
       .then(setLessons)
       .catch((err) => showError(err, t));
-  }, [token, courseId]);
+  }, [token, courseId, refreshKey]);
   if (!token) return null;
   return (
     <Page title={t.lessons_title}>
@@ -43,10 +43,12 @@ export function LessonCreateForm({
   lang,
   token,
   courseId,
+  onCreated,
 }: {
   lang: Lang;
   token: string;
   courseId: string;
+  onCreated?: () => void;
 }) {
   const t = dict[lang];
   const [title, setTitle] = useState("");
@@ -80,7 +82,10 @@ export function LessonCreateForm({
               transcript_voice: voice || undefined,
               transcript_book: book || undefined,
             })
-            .then(() => show(t.lesson_create_success))
+            .then(() => {
+              show(t.lesson_create_success);
+              onCreated?.();
+            })
             .catch((err) => showError(err, t));
         }}
       >
@@ -249,12 +254,11 @@ export function LessonAudioUpload({
   }
   return (
     <Page title={t.lesson_upload_title}>
-      <label style={{ display: "block", marginBottom: 8 }}>
+      <label className="field">
         {t.lesson_upload_choose}
         <input
           type="file"
           accept="audio/*"
-          style={{ display: "block", width: "100%", marginTop: 4 }}
           onChange={(e) => setFile(e.target.files?.[0] ?? null)}
         />
       </label>
@@ -296,7 +300,7 @@ export function LessonPlayer({
       >
         {t.lesson_play_submit}
       </button>
-      {src ? <audio controls preload="metadata" src={src} style={{ width: "100%" }} /> : null}
+      {src ? <audio controls preload="metadata" src={src} /> : null}
       {msg ? <Notice message={msg} /> : null}
     </Page>
   );

@@ -80,6 +80,16 @@ async def get_lesson(db: AsyncSession, actor: User, lesson_id: str) -> Lesson:
     return lesson
 
 
+async def get_lesson_detail(db: AsyncSession, actor: User, lesson_id: str) -> tuple[Lesson, bool]:
+    """Lesson + writer flag so the endpoint returns full transcripts to
+    teachers/admins and the audio-only student view to approved students."""
+    lesson = await get_lesson(db, actor, lesson_id)
+    course = await course_repository.get_by_id(db, str(lesson.course_id))
+    if course is None:
+        raise CourseNotFound("Course not found.")
+    return lesson, can_write(actor, course)
+
+
 async def _lesson_or_404(db: AsyncSession, lesson_id: str) -> Lesson:
     lesson = await lesson_repository.get_by_id(db, lesson_id)
     if lesson is None:

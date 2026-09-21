@@ -44,7 +44,15 @@ export function statusLabel(t: UIText, status: string): string {
   return status;
 }
 
-export function JoinForm({ lang, token }: { lang: Lang; token: string }) {
+export function JoinForm({
+  lang,
+  token,
+  onJoined,
+}: {
+  lang: Lang;
+  token: string;
+  onJoined?: () => void;
+}) {
   const t = dict[lang];
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
@@ -67,6 +75,7 @@ export function JoinForm({ lang, token }: { lang: Lang; token: string }) {
             .then(() => {
               show(t.enroll_success);
               setCode("");
+              onJoined?.();
             })
             .catch((err) => showError(err, t));
         }}
@@ -126,7 +135,7 @@ export function CodesPanel({ lang, token }: { lang: Lang; token: string }) {
         onChange={(e) => setExpiresDays(e.target.value)}
         inputMode="numeric"
       />
-      <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+      <div className="btn-row">
         <button
           type="button"
           onClick={() => {
@@ -161,21 +170,22 @@ export function CodesPanel({ lang, token }: { lang: Lang; token: string }) {
             {usesCounts[c.id] !== undefined ? ` (${t.codes_used_by}: ${usesCounts[c.id]})` : ""}
             {c.revoked_at ? ` (${t.codes_revoked})` : ""}
             {!c.revoked_at ? (
-              <button
-                type="button"
-                style={{ marginInlineStart: 8 }}
-                onClick={() => {
-                  enrollmentsApi
-                    .revokeCode(token, courseId, c.id)
-                    .then((d) => {
-                      setCodes(d.codes);
-                      show(t.codes_revoke_success);
-                    })
-                    .catch((err) => showError(err, t));
-                }}
-              >
-                {t.codes_revoke}
-              </button>
+              <span className="row-actions">
+                <button
+                  type="button"
+                  onClick={() => {
+                    enrollmentsApi
+                      .revokeCode(token, courseId, c.id)
+                      .then((d) => {
+                        setCodes(d.codes);
+                        show(t.codes_revoke_success);
+                      })
+                      .catch((err) => showError(err, t));
+                  }}
+                >
+                  {t.codes_revoke}
+                </button>
+              </span>
             ) : null}
           </li>
         ))}
@@ -223,7 +233,7 @@ export function QueuePanel({ lang, token }: { lang: Lang; token: string }) {
   return (
     <RequireToken lang={lang} token={token} title={t.queue_title}>
       <TextField label={t.course_id} value={courseId} onChange={(e) => setCourseId(e.target.value)} required />
-      <label style={{ display: "block", marginBottom: 8 }}>
+      <label className="field">
         {t.queue_filter}
         <select
           value={filter}
@@ -231,7 +241,6 @@ export function QueuePanel({ lang, token }: { lang: Lang; token: string }) {
             setFilter(e.target.value);
             refresh(courseId, e.target.value);
           }}
-          style={{ display: "block", width: "100%", marginTop: 4 }}
         >
           <option value="pending">{t.status_pending}</option>
           <option value="approved">{t.status_approved}</option>
@@ -243,13 +252,13 @@ export function QueuePanel({ lang, token }: { lang: Lang; token: string }) {
       <button type="button" onClick={() => refresh(courseId, filter)}>
         {t.codes_refresh}
       </button>
-      <ul>
+      <ul className="card-list">
         {rows.map((r) => (
-          <li key={r.id}>
+          <li key={r.id} className="card">
             {r.display_name} {r.phone ? `— ${r.phone}` : ""} {r.note ? `— ${r.note}` : ""}
             {r.code_id && prefixes[r.code_id] ? ` (${t.queue_via}: ${prefixes[r.code_id]}…)` : ""}
             {` — ${statusLabel(t, r.status)}`}
-            <span style={{ display: "inline-flex", gap: 8, marginInlineStart: 8 }}>
+            <span className="row-actions">
               <button type="button" onClick={() => decide(r.id, "approve")}>
                 {t.queue_approve}
               </button>
