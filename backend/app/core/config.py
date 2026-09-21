@@ -26,6 +26,13 @@ class Settings(BaseSettings):
     CODE_DEFAULT_EXPIRE_DAYS: int = 7
     CODE_DEFAULT_MAX_USES: int = 50
     CODE_MAX_ACTIVE_PER_COURSE: int = 5
+    S3_ENDPOINT_URL: str | None = None
+    S3_REGION: str = "auto"
+    S3_ACCESS_KEY_ID: str | None = None
+    S3_SECRET_ACCESS_KEY: str | None = None
+    S3_BUCKET: str = "majlis-media"
+    S3_UPLOAD_EXPIRE_SEC: int = 900
+    S3_PLAY_EXPIRE_SEC: int = 3600
     ADMIN_EMAIL: str | None = None
     ADMIN_PASSWORD: str | None = None
 

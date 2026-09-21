@@ -52,7 +52,10 @@ services:
     environment:
       DATABASE_URL: postgresql+asyncpg://majlis:majlis@postgres:5432/majlis
       REDIS_URL: redis://redis:6379/0
-      SECRET_KEY: dev-only-insecure-secret-change-me
+      # Secrets and identity come from the shell environment (or an
+      # `infra/.env` file, gitignored) — never hardcoded here. Dev defaults
+      # below are insecure placeholders for local-only runs.
+      SECRET_KEY: ${SECRET_KEY:-dev-only-insecure-secret-change-me}
       JWT_ALGORITHM: HS256
       ACCESS_TOKEN_EXPIRE_MINUTES: 15
       REFRESH_TOKEN_EXPIRE_DAYS: 7
@@ -60,8 +63,26 @@ services:
       RESET_TOKEN_EXPIRE_HOURS: 1
       SMTP_HOST: mailpit
       SMTP_PORT: 1025
-      SMTP_FROM: "Majlis <no-reply@majlis.local>"
+      SMTP_FROM: ${SMTP_FROM:-Majlis <no-reply@majlis.local>}
       FRONTEND_URL: http://localhost:8080
+      # Seam 3 storage (ticket 05): Cloudflare R2 credentials come from the
+      # shell environment (or an `infra/.env` file) — never hardcoded here.
+      # R2 CORS (set once in the Cloudflare dashboard for the bucket).
+      # Valid values only: real scheme://host origins (no placeholders),
+      # methods GET/PUT/HEAD/DELETE (OPTIONS is rejected). Minimal rule:
+      # [{"AllowedOrigins": ["http://localhost:5173", "http://localhost:8080"],
+      #   "AllowedMethods": ["PUT", "GET", "HEAD"],
+      #   "AllowedHeaders": ["Content-Type", "Content-Length", "Range"],
+      #   "ExposeHeaders": ["ETag", "Accept-Ranges", "Content-Range", "Content-Length"],
+      #   "MaxAgeSeconds": 3600}]
+      # Add your Pages domain to AllowedOrigins when it exists.
+      S3_ENDPOINT_URL: ${S3_ENDPOINT_URL:-}
+      S3_REGION: ${S3_REGION:-auto}
+      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-}
+      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-}
+      S3_BUCKET: ${S3_BUCKET:-majlis-media}
+      S3_UPLOAD_EXPIRE_SEC: 900
+      S3_PLAY_EXPIRE_SEC: 3600
     ports:
       - "8000:8000"
     command:

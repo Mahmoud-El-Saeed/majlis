@@ -18,7 +18,6 @@ flowchart LR
     API --> R2[(Cloudflare R2<br/>private audio bucket)]
     API --> LLMs[Groq / OpenRouter / Gemini<br/>via key vault]
     API --> SMTP[SMTP prod<br/>Mailpit in dev]
-    R2 --> Drive[(Google Drive archive<br/>scheduled rclone sync)]
 ```
 
 Rules: browsers never touch R2/Postgres/Qdrant directly — every byte goes through presigned URLs (uploads) or signed playback URLs (streaming) after API membership checks. The VPS never stores media bytes.

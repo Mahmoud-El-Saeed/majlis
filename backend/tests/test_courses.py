@@ -81,9 +81,7 @@ async def test_course_read_gated_until_approved(client):
     )
     assert join.status_code == 201, join.text
     eid = join.json()["id"]
-    assert (
-        await client.post(f"/api/v1/enrollments/{eid}/approve", headers=h)
-    ).status_code == 200
+    assert (await client.post(f"/api/v1/enrollments/{eid}/approve", headers=h)).status_code == 200
     lst2 = await client.get("/api/v1/courses", headers=sh)
     assert any(c["id"] == cid for c in lst2.json())
     one2 = await client.get(f"/api/v1/courses/{cid}", headers=sh)

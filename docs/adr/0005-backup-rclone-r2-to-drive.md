@@ -1,18 +1,22 @@
 # ADR-0005: Backup — scheduled rclone sync R2 → Google Drive
 
-Status: accepted
+Status: deferred (post-V1)
 
 ## Context
 
-The sheikh's recordings are irreplaceable. R2 alone (single account, no versioning story in V1) is not a backup. The circle already keeps a Google Drive archive. Waiting until the end of the build to back up recordings that start landing in R2 mid-build is the exact risk this exists to prevent.
+The sheikh's recordings are irreplaceable. R2 alone (single account, no versioning story in V1) is not a backup. The circle already keeps a Google Drive archive.
 
-## Decision
+## Decision (deferred)
 
-- Scheduled rclone sync from R2 to the existing Google Drive archive as disaster recovery.
-- The schedule plus a backup-status indicator (last success, object counts) ships with the storage ticket, from the moment recordings land in R2.
-- The manual restore runbook ships later with hardening; the schedule may not wait for it.
+- No scheduled backup ships in V1. R2 is the sole copy of media bytes until this ADR is re-activated.
+- When re-activated: scheduled rclone sync from R2 to the existing Google Drive archive as disaster recovery, plus a backup-status indicator (last success, object counts) and a manual restore runbook.
+- Ticket 05 no longer carries backup scope; ticket 13 tracks the deferral.
 
 ## Consequences
 
-- Requires rclone remote config + schedule (cron/systemd timer) and Drive credentials handling alongside the storage work.
-- Restore is manual in V1 (documented runbook in hardening); automated restore is V2.
+- V1 accepts single-copy risk on R2; restore story is out of scope until post-V1.
+- Re-activation requires rclone remote config + schedule (cron/systemd timer) and Drive credentials handling.
+
+## History
+
+- Was `accepted` with the schedule shipping in ticket 05; moved to `deferred` per scope decision to keep V1 backup-free.

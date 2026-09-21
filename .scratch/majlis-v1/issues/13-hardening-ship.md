@@ -9,5 +9,5 @@
 - [ ] Frontend deployed to Cloudflare Pages; API on VPS with TLS
 - [ ] Production SMTP provider configured (dev Mailpit from ticket 01 is replaced, not removed)
 - [ ] Rate-limits verified on signup/login/join-code/chat paths
-- [ ] Manual restore runbook documented (the backup schedule itself already shipped in ticket 05)
+- [ ] Backup + restore deferred to post-V1 (no R2→Drive schedule or restore runbook in V1; see ADR-0005)
 - [ ] Full E2E smoke passes: signup → join → approve → listen → exam → grade → chat

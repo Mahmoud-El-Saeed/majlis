@@ -16,4 +16,4 @@ Media must stream to phones without routing bytes through the VPS, stay private 
 ## Consequences
 
 - The API verifies object existence on confirm and issues playback URLs after membership checks.
-- Direct R2 dependence is mitigated by the scheduled Drive backup (ADR-0005).
+- R2 is the sole copy of media bytes in V1; scheduled backup is deferred to post-V1 (see ADR-0005).

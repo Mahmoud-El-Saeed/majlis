@@ -2,7 +2,7 @@
 
 **What to build:** the student side of Milestone 1 — dashboard, course joining, and lesson listening on phones.
 
-**Blocked by:** 04 Codes + approvals, 05 Direct-to-R2 audio upload + backup schedule.
+**Blocked by:** 04 Codes + approvals, 05 Direct-to-R2 audio upload.
 
 **Status:** ready-for-agent
 

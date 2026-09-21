@@ -20,9 +20,7 @@ class EnrollmentCodeRepository:
         """Row-locked read for the join path so concurrent consumes cannot
         overshoot max_uses (SELECT ... FOR UPDATE inside the request txn)."""
         result = await db.execute(
-            select(EnrollmentCode)
-            .where(EnrollmentCode.code_hash == code_hash)
-            .with_for_update()
+            select(EnrollmentCode).where(EnrollmentCode.code_hash == code_hash).with_for_update()
         )
         return result.scalars().first()
 

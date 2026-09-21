@@ -15,7 +15,15 @@ settings = get_settings()
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
-    """Seed the first admin from env (ticket 02); tables come from migrations."""
+    """Seed the first admin from env (ticket 02); tables come from migrations.
+
+    Creates the shared aioboto3 Session for Seam 3 storage (ticket 05).
+    The Session itself holds no connections; per-request clients are opened
+    with `async with` in the storage dependency and closed on exit.
+    """
+    import aioboto3
+
+    _app.state.storage_session = aioboto3.Session()
     async with AsyncSessionLocal() as session:
         try:
             await ensure_admin_seed(session)

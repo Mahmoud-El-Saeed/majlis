@@ -1,6 +1,6 @@
-# 05: Direct-to-R2 audio upload + backup schedule
+# 05: Direct-to-R2 audio upload
 
-**What to build:** audio-only media handling with no worker — browser uploads straight to R2, API verifies, students stream; plus the disaster-recovery backup that must exist from the moment recordings land in R2.
+**What to build:** audio-only media handling with no worker — browser uploads straight to R2, API verifies, students stream. (Backup to Google Drive is deferred to post-V1; R2 is the sole copy in V1.)
 
 **Blocked by:** 01 Bootstrap + Identity vertical, 03 Course + Lesson library.
 
@@ -10,4 +10,3 @@
 - [ ] Failed upload retries with a fresh URL; unverified lessons never show as ready
 - [ ] Audio-only validation in V1; media_type stays generic for V2 video
 - [ ] Playback via short-lived signed URLs with Range support in an HTML5 audio player
-- [ ] Scheduled rclone sync R2 → the existing Google Drive archive runs, and a backup-status indicator (last success, object counts) is visible to admin

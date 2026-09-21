@@ -15,7 +15,7 @@ Majlis / مجلس — a private LMS with Arabic-first frontend for a single mosq
 - Files: audio-only V1, browser uploads directly to object storage via presigned URLs, streamed with byte-range.
 - Configurable exams (MCQ / True-False / essay) with gradebook and teacher-controlled result visibility.
 - Per-course RAG chatbot that answers only from lesson transcripts and cites the lesson.
-- All Dockerized for a single VPS + CDN frontend, plus a scheduled backup of irreplaceable recordings to the existing Google Drive archive.
+- All Dockerized for a single VPS + CDN frontend. (Recording backup is deferred to post-V1; R2 is the sole copy in V1.)
 
 Milestone 1 = tickets 01–06: at its end the sheikh can log in, create a course, generate codes, approve students, upload a lesson's audio + transcripts, and students can listen. Exams and chatbot come after; sequencing decisions must protect this milestone.
 
@@ -49,7 +49,6 @@ Milestone 1 = tickets 01–06: at its end the sheikh can log in, create a course
 26. As a student, I want to ask the per-course chatbot in Arabic and get answers only from transcripts with lesson citation (title + pages), so that I trust it matches what the sheikh said.
 27. As a student, I want a clear “not explained in lessons” refusal plus “AI busy” notice with daily quota, so that hallucinations and cost overruns are bounded.
 28. As a system, I want rate-limiting on signup/login/join-code/chat, so that public student signup cannot be spammed.
-29. As the sheikh, I want recordings backed up to the existing Google Drive archive on a schedule, so that irreplaceable lessons survive an R2 failure.
 
 ## Implementation Decisions
 
@@ -75,7 +74,6 @@ Modules and interfaces:
 - Key vault: provider/model/encrypted key/weight/active/quota/last_used stored in Postgres encrypted at rest (Fernet), decrypt only in worker memory, rotation by least-recently-used skipping 429/5xx, full usage log with tokens/latency/error, Redis caches rotation pointer for speed. Master encryption key only secret in env; no provider keys in .env ever.
 - API style: async FastAPI, async Postgres access, Alembic migrations, JWT short access + long refresh. Arabic-first in frontend: user-facing error messages are localized in the frontend; backend messages stay English, and backend-sent emails keep Arabic bodies per the ticket-01 pattern.
 - Deployment: Docker Compose services api + postgres + qdrant + redis + reverse-proxy (no worker). Frontend static build via Cloudflare Pages (fallback static via Nginx). Redis is used for rate-limiting, chat cache, and rotation pointer.
-- Backup: scheduled rclone sync R2 → the existing Google Drive archive as disaster recovery (see ADR-0005).
 - Rejected vs blocked semantics: rejected = soft, may re-apply with new code; blocked = per-course ban, cannot rejoin that course; platform ban admin-only.
 - Role/enrollment split: role grants capabilities platform-wide; enrollment grants trust per course. Inviting an existing student promotes that account to teacher (history preserved); any verified user may join any course via code + approval, including teachers studying with other teachers.
 - Lesson upload in V1 admin-only; teacher-upload is V2 to bound scope.
@@ -112,7 +110,8 @@ Prior art: greenfield, no existing tests. Start with API-level behavior tests pe
 - Automatic Whisper/agent transcription pipeline — V1 manual paste; auto is V2.
 - Teacher self-upload UI beyond admin — V2.
 - Multi-organization SaaS, HLS streaming, video multi-bitrate, shuffle/proctoring, mobile native app, Drive sync (upload direction), public course discovery.
-- Unlimited retention guarantees beyond R2 + scheduled Drive backup.
+- Unlimited retention guarantees beyond R2.
+- Scheduled backup of recordings to Google Drive + restore runbook (deferred to post-V1; was ADR-0005).
 
 ## Further Notes
 

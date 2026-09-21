@@ -98,12 +98,12 @@ Prior art: greenfield, no existing tests. Start with API-level behavior tests pe
 - Automatic Whisper/agent transcription pipeline — V1 manual upload of two txt files; auto is V2.
 - Teacher self-upload UI beyond admin — V2.
 - Multi-organization SaaS, HLS streaming, video multi-bitrate, shuffle/proctoring, mobile native app, Drive sync, public course discovery.
-- Transcoding presets choice, unlimited retention guarantees beyond single snapshot + R2.
+- Transcoding presets choice, unlimited retention guarantees beyond R2, scheduled recording backup + restore (deferred to post-V1).
 
 ## Further Notes
 
 - Working name Majlis / مجلس, tagline direction “private circle”. Logo placeholder uppercase MAJLIS.
 - Full-time build estimate 6-8 weeks all-in-one V1: auth/enrollment + courses/lessons + storage pipeline, then exams, then RAG + vault. Do not split bot to later without explicit re-scope.
 - Frontend must be responsive for mobile sizes, RTL Arabic first, no native app.
-- Operational warning: 100GB VPS is temp only; R2 is source of truth; single snapshot backup accepted for V1.
+- Operational warning: 100GB VPS is temp only; R2 is source of truth and sole copy for V1.
 - Cost control: external LLM APIs required (Groq/OpenRouter for generation, Gemini for embeddings); Qdrant stays on VPS; quota + cache mandatory.
