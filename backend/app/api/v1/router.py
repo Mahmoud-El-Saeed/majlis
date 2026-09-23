@@ -6,6 +6,7 @@ from app.api.v1.endpoints import (
     courses,
     dashboard,
     enrollments,
+    exams,
     invites,
     lesson_media,
     lessons,
@@ -20,3 +21,4 @@ api_router.include_router(lessons.router)
 api_router.include_router(lesson_media.router)
 api_router.include_router(attachments.router)
 api_router.include_router(enrollments.router)
+api_router.include_router(exams.router)

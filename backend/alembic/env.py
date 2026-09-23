@@ -13,8 +13,10 @@ from app.models import course as _course  # noqa: F401
 from app.models import enrollment as _enrollment  # noqa: F401
 from app.models import enrollment_code as _enrollment_code  # noqa: F401
 from app.models import code_use as _code_use  # noqa: F401
+from app.models import exam as _exam  # noqa: F401
 from app.models import lesson as _lesson  # noqa: F401
 from app.models import lesson_attachment as _lesson_attachment  # noqa: F401
+from app.models import question as _question  # noqa: F401
 from app.models import teacher_invite as _teacher_invite  # noqa: F401
 from app.models import user as _user  # noqa: F401
 
