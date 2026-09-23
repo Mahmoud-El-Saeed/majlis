@@ -1,3 +1,4 @@
+from .attempt import Attempt, AttemptAnswer, AttemptStatus
 from .code_use import CodeUse
 from .course import Course
 from .enrollment import Enrollment, EnrollmentStatus
@@ -10,6 +11,9 @@ from .teacher_invite import TeacherInvite
 from .user import Role, User
 
 __all__ = [
+    "Attempt",
+    "AttemptAnswer",
+    "AttemptStatus",
     "CodeUse",
     "Course",
     "Enrollment",

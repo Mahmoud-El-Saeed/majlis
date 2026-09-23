@@ -2,6 +2,7 @@ from fastapi import APIRouter
 
 from app.api.v1.endpoints import (
     attachments,
+    attempts,
     auth,
     courses,
     dashboard,
@@ -22,3 +23,4 @@ api_router.include_router(lesson_media.router)
 api_router.include_router(attachments.router)
 api_router.include_router(enrollments.router)
 api_router.include_router(exams.router)
+api_router.include_router(attempts.router)

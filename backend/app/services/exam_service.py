@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.exam import Exam, ShowResultMode
 from app.models.question import Question, QuestionType
 from app.models.user import User
+from app.repositories.attempt_repository import attempt_repository
 from app.repositories.course_repository import course_repository
 from app.repositories.exam_repository import exam_repository
 from app.repositories.lesson_repository import lesson_repository
@@ -149,7 +150,17 @@ async def update_exam(db: AsyncSession, actor: User, exam_id: str, data: ExamUpd
     if data.pass_score is not None:
         exam.pass_score = data.pass_score
     if data.show_result is not None:
-        exam.show_result = ShowResultMode(data.show_result)
+        new_mode = ShowResultMode(data.show_result)
+        if (
+            new_mode == ShowResultMode.after_publish
+            and exam.show_result == ShowResultMode.immediate
+        ):
+            # Hiding results must hide already-visible scores too: clear the
+            # publish flag so past attempts fall back to receipt-only until
+            # the teacher publishes (ticket 09). The reverse flip needs no
+            # flag change — immediate mode reveals regardless of the flag.
+            await attempt_repository.unpublish_for_exam(db, exam.id)
+        exam.show_result = new_mode
     await db.flush()
     await db.refresh(exam)
     return exam

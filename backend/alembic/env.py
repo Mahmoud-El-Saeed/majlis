@@ -9,6 +9,7 @@ from sqlalchemy.engine import create_engine
 from alembic import context
 from app.core.config import get_settings
 from app.core.database import Base
+from app.models import attempt as _attempt  # noqa: F401
 from app.models import course as _course  # noqa: F401
 from app.models import enrollment as _enrollment  # noqa: F401
 from app.models import enrollment_code as _enrollment_code  # noqa: F401
