@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.attempt import Attempt, AttemptStatus
@@ -69,14 +69,44 @@ class AttemptRepository:
         scores must hide until the teacher publishes (ticket 09 owns the
         publish mutation; this is the reverse transition).
         """
-        from sqlalchemy import update
-
         await db.execute(
             update(Attempt)
             .where(Attempt.exam_id == exam_id, Attempt.is_published.is_(True))
             .values(is_published=False)
         )
         await db.flush()
+
+    async def publish_for_exam(self, db: AsyncSession, exam_id: uuid.UUID) -> int:
+        """Publish all submitted unpublished attempts for an exam.
+
+        Ticket 09 bulk path (POST /exams/{id}/publish). Returns the number
+        of attempts flipped. In-progress rows are never published.
+        """
+        result = await db.execute(
+            update(Attempt)
+            .where(
+                Attempt.exam_id == exam_id,
+                Attempt.status == AttemptStatus.submitted,
+                Attempt.is_published.is_(False),
+            )
+            .values(is_published=True)
+        )
+        await db.flush()
+        return int(getattr(result, "rowcount", 0) or 0)
+
+    async def list_submitted_for_course(
+        self, db: AsyncSession, course_id: uuid.UUID
+    ) -> list[Attempt]:
+        """One entry per submitted attempt (ticket 09 grain: every attempt)."""
+        result = await db.execute(
+            select(Attempt)
+            .where(
+                Attempt.course_id == course_id,
+                Attempt.status == AttemptStatus.submitted,
+            )
+            .order_by(Attempt.exam_id.asc(), Attempt.submitted_at.asc())
+        )
+        return list(result.scalars().all())
 
     async def save(self, db: AsyncSession, attempt: Attempt) -> Attempt:
         db.add(attempt)

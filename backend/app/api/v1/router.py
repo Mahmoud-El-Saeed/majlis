@@ -8,6 +8,7 @@ from app.api.v1.endpoints import (
     dashboard,
     enrollments,
     exams,
+    grading,
     invites,
     lesson_media,
     lessons,
@@ -24,3 +25,4 @@ api_router.include_router(attachments.router)
 api_router.include_router(enrollments.router)
 api_router.include_router(exams.router)
 api_router.include_router(attempts.router)
+api_router.include_router(grading.router)
