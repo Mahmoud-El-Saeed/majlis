@@ -1,3 +1,5 @@
+from datetime import UTC, datetime
+
 from fastapi import APIRouter, HTTPException, status
 
 from app.api.dependencies import CurrentUserDep, DbDep
@@ -9,9 +11,11 @@ from app.schemas.exams import (
     QuestionCreateIn,
     QuestionOut,
     QuestionUpdateIn,
+    StudentExamOut,
     to_exam_detail_out,
     to_exam_out,
     to_question_out,
+    to_student_exam_out,
 )
 from app.services import exam_service
 from app.services.course_service import CourseForbidden, CourseNotFound
@@ -52,6 +56,24 @@ async def list_exams(db: DbDep, actor: CurrentUserDep, course_id: str) -> list[E
     except _EXAM_ERRORS as e:
         raise HTTPException(status_code=_error_status(e), detail=e.message) from None
     return [to_exam_out(e) for e in exams]
+
+
+@router.get("/courses/{course_id}/student-exams", response_model=list[StudentExamOut])
+async def list_student_exams(
+    db: DbDep, actor: CurrentUserDep, course_id: str
+) -> list[StudentExamOut]:
+    """Student-safe discovery (ticket 14): can_view gate, never correct_* keys."""
+    try:
+        rows = await exam_service.list_student_exams(db, actor, course_id)
+    except _EXAM_ERRORS as e:
+        raise HTTPException(status_code=_error_status(e), detail=e.message) from None
+    now = datetime.now(UTC)
+    return [
+        to_student_exam_out(
+            exam, attempts_used=used, has_in_progress=active, last_score=score, now=now
+        )
+        for exam, used, active, score in rows
+    ]
 
 
 @router.get("/exams/{exam_id}", response_model=ExamDetailOut)

@@ -11,7 +11,7 @@ from app.repositories.exam_repository import exam_repository
 from app.repositories.lesson_repository import lesson_repository
 from app.repositories.question_repository import question_repository
 from app.schemas.exams import ExamCreateIn, ExamUpdateIn, QuestionCreateIn, QuestionUpdateIn
-from app.services.course_service import CourseNotFound, can_write
+from app.services.course_service import CourseNotFound, can_view, can_write
 
 
 class ExamError(Exception):
@@ -86,6 +86,38 @@ async def list_exams(db: AsyncSession, actor: User, course_id: str) -> list[Exam
     course = await _course_or_404(db, course_id)
     _check_can_write(actor, course)
     return await exam_repository.list_for_course(db, course.id)
+
+
+async def list_student_exams(
+    db: AsyncSession, actor: User, course_id: str
+) -> list[tuple[Exam, int, bool, int | None]]:
+    """Student-safe per-course list (ticket 14).
+
+    Gate is can_view: approved enrollment, owner-teacher, or admin.
+    Pending/blocked/outsider get ExamForbidden (403); anon 401 upstream.
+    Writers keep the existing can_write preview path untouched.
+    """
+    from app.models.attempt import AttemptStatus
+    from app.services.attempt_service import show_grades_for
+
+    course = await _course_or_404(db, course_id)
+    if not await can_view(db, actor, course):
+        raise ExamForbidden("Not authorized.")
+    exams = await exam_repository.list_for_course(db, course.id)
+    out: list[tuple[Exam, int, bool, int | None]] = []
+    for exam in exams:
+        # No role check here (capability rule): every viewer gets their own
+        # real rows. Writers naturally read zeros — start-attempt is
+        # student-strict, so they can never hold attempts.
+        rows = await attempt_repository.list_for_exam_student(db, exam.id, actor.id)
+        submitted = [a for a in rows if a.status == AttemptStatus.submitted]
+        active = any(a.status == AttemptStatus.in_progress for a in rows)
+        latest = submitted[-1] if submitted else None
+        visible_score = (
+            latest.score if latest is not None and show_grades_for(exam, latest) else None
+        )
+        out.append((exam, len(rows), active, visible_score))
+    return out
 
 
 async def _exam_and_course(db: AsyncSession, exam_id: str):  # type: ignore[no-untyped-def]

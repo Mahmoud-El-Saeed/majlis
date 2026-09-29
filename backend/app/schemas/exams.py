@@ -109,6 +109,22 @@ class ExamDetailOut(ExamOut):
     questions: list[QuestionOut] = []
 
 
+class StudentExamOut(ExamOut):
+    """Student-safe projection: exam config plus personal progress.
+
+    Never carries questions or correct_* keys (no-leak guarantee).
+    window_status is display-only; enforcement stays server-side at start/submit.
+    last_score is the latest submitted score, or null when there is none or
+    the exam hides results until publish (after_publish + unpublished).
+    """
+
+    attempts_used: int
+    attempts_left: int
+    window_status: Literal["open", "upcoming", "closed"]
+    has_in_progress: bool
+    last_score: int | None = None
+
+
 def to_exam_out(exam) -> ExamOut:  # type: ignore[no-untyped-def]
     return ExamOut(
         id=str(exam.id),
@@ -148,4 +164,40 @@ def to_exam_detail_out(exam, questions: list) -> ExamDetailOut:  # type: ignore[
     return ExamDetailOut(
         **base.model_dump(),
         questions=[to_question_out(q) for q in questions],
+    )
+
+
+def _ensure_aware(moment):  # type: ignore[no-untyped-def]
+    """Treat naive datetimes as UTC so display math never mixes tz-aware/naive."""
+    if moment is None:
+        return None
+    if moment.tzinfo is None:
+        from datetime import UTC
+
+        return moment.replace(tzinfo=UTC)
+    return moment
+
+
+def _window_status(open_at, close_at, now) -> Literal["open", "upcoming", "closed"]:  # type: ignore[no-untyped-def]
+    """Display-only window state. Enforcement lives in attempt_service."""
+    opens_at, closes_at = _ensure_aware(open_at), _ensure_aware(close_at)
+    if opens_at is not None and now < opens_at:
+        return "upcoming"
+    if closes_at is not None and now >= closes_at:
+        return "closed"
+    return "open"
+
+
+def to_student_exam_out(  # type: ignore[no-untyped-def]
+    exam, *, attempts_used: int, has_in_progress: bool, last_score: int | None, now
+) -> StudentExamOut:
+    base = to_exam_out(exam)
+    left = max(exam.attempts_limit - attempts_used, 0)
+    return StudentExamOut(
+        **base.model_dump(),
+        attempts_used=attempts_used,
+        last_score=last_score,
+        attempts_left=left,
+        window_status=_window_status(exam.open_at, exam.close_at, now),
+        has_in_progress=has_in_progress,
     )
