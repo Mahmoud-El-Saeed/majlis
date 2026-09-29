@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>مجلس — معاينة الطراز الأندلسي</title>
+<link rel="icon" type="image/svg+xml" href="assets/logo-star.svg">
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config = {
+  darkMode: 'class',
+  theme: {
+    extend: {
+      fontFamily: {
+        heading: ['"Reem Kufi"', '"Amiri"', 'serif'],
+        body: ['"Tajawal"', '"Cairo"', 'sans-serif'],
+      },
+      colors: {
+        ivory: '#F1E8D2',
+        turq: '#1E847F',
+        terra: '#C1543D',
+        gold: '#D4AF37',
+        night: '#0F172A',
+        cream: '#E5E0D8',
+        brown: '#2D2727',
+        emeralddeep: '#065F46',
+        sand: '#EFE7D6',
+      }
+    }
+  }
+}
+</script>
+<style>
+  /* ---- Local fonts (installed in design-system/majlis/fonts/) ---- */
+  @font-face{ font-family:'Reem Kufi'; font-style:normal; font-weight:400; font-display:swap; src:url('fonts/ReemKufi-Regular.ttf') format('truetype'); }
+  @font-face{ font-family:'Reem Kufi'; font-style:normal; font-weight:700; font-display:swap; src:url('fonts/ReemKufi-Bold.ttf') format('truetype'); }
+  @font-face{ font-family:'Amiri'; font-style:normal; font-weight:400; font-display:swap; src:url('fonts/Amiri-Regular.ttf') format('truetype'); }
+  @font-face{ font-family:'Tajawal'; font-style:normal; font-weight:400; font-display:swap; src:url('fonts/Tajawal-Regular.ttf') format('truetype'); }
+  @font-face{ font-family:'Tajawal'; font-style:normal; font-weight:700; font-display:swap; src:url('fonts/Tajawal-Bold.ttf') format('truetype'); }
+  @font-face{ font-family:'Cairo'; font-style:normal; font-weight:400 700; font-display:swap; src:url('fonts/Cairo.ttf') format('truetype'); }
+
+  :root{
+    --bg:#F1E8D2; --surface:#FFFDF6; --primary:#1E847F; --primary-ink:#0C3B39;
+    --secondary:#C1543D; --gold:#D4AF37; --text:#2D2727; --muted:#6B5F56;
+    --border:#E4D9C2; --sand:#EFE7D6;
+  }
+  html.dark{
+    --bg:#0F172A; --surface:#16213A; --primary:#D4AF37; --primary-ink:#3A2E08;
+    --secondary:#34D399; --gold:#D4AF37; --text:#E5E0D8; --muted:#B8B2A6;
+    --border:#2B3A55; --sand:#1B2742;
+  }
+  html{ scroll-behavior:smooth; }
+  body{ font-family:'Tajawal','Cairo',sans-serif; background:var(--bg); color:var(--text); }
+  h1,h2,h3,.font-heading{ font-family:'Reem Kufi','Amiri',serif; }
+  .font-classic{ font-family:'Amiri',serif; }
+  .transition-ui{ transition:background-color 200ms,color 200ms,border-color 200ms,box-shadow 200ms,opacity 200ms; }
+  .clickable{ cursor:pointer; }
+  :focus-visible{ outline:2px solid var(--primary); outline-offset:2px; border-radius:6px; }
+  @media (prefers-reduced-motion: reduce){ *{ animation:none!important; transition:none!important; scroll-behavior:auto!important; } }
+
+  /* ---- Zellige tessellation: 8-pointed star grid, 4% opacity hero/footer ---- */
+  .zellige{
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='72' height='72' viewBox='0 0 72 72'%3E%3Cg fill='none' stroke='%23587F77' stroke-width='1.6'%3E%3Crect x='22' y='22' width='28' height='28'/%3E%3Crect x='22' y='22' width='28' height='28' transform='rotate(45 36 36)'/%3E%3Ccircle cx='36' cy='36' r='3'/%3E%3Ccircle cx='0' cy='0' r='8'/%3E%3Ccircle cx='72' cy='0' r='8'/%3E%3Ccircle cx='0' cy='72' r='8'/%3E%3Ccircle cx='72' cy='72' r='8'/%3E%3C/g%3E%3C/svg%3E");
+    background-size:80px 80px;
+  }
+  .zellige-veil{ position:relative; }
+  .zellige-veil::before{ content:''; position:absolute; inset:0; background:var(--bg); opacity:.87; pointer-events:none; }
+  html.dark .zellige-veil::before{ background:#0F172A; opacity:.94; }
+  .zellige-veil > *{ position:relative; }
+  html.dark .zellige{ background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='72' height='72' viewBox='0 0 72 72'%3E%3Cg fill='none' stroke='%23D4AF37' stroke-width='1.2'%3E%3Crect x='22' y='22' width='28' height='28'/%3E%3Crect x='22' y='22' width='28' height='28' transform='rotate(45 36 36)'/%3E%3Ccircle cx='36' cy='36' r='3'/%3E%3C/g%3E%3C/svg%3E"); }
+
+  /* ---- Horseshoe arch cards & images ---- */
+  .arch{ border-radius:150px 150px 20px 20px; }
+  .arch-sm{ border-radius:90px 90px 14px 14px; }
+  .arch-frame{ position:relative; border:1.5px solid var(--border); }
+  .arch-frame::after{ content:''; position:absolute; inset:8px; border:1px solid var(--gold); opacity:.55; border-radius:inherit; pointer-events:none; }
+  .arch-img{ border-radius:120px 120px 16px 16px; overflow:hidden; border:1.5px solid var(--gold); }
+
+  /* ---- Arabesque corner ornament for cards ---- */
+  .arabesque{ position:relative; }
+  .arabesque::before,.arabesque::after{
+    content:''; position:absolute; width:54px; height:54px; opacity:.5; pointer-events:none;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 54 54'%3E%3Cg fill='none' stroke='%23D4AF37' stroke-width='1.4'%3E%3Cpath d='M4 50 C 4 26, 26 4, 50 4'/%3E%3Cpath d='M12 50 C 12 30, 30 12, 50 12'/%3E%3Ccircle cx='10' cy='44' r='2.5' fill='%23D4AF37'/%3E%3Ccircle cx='44' cy='10' r='2.5' fill='%23D4AF37'/%3E%3Cpath d='M27 20 l3 5 5 3 -5 3 -3 5 -3 -5 -5 -3 5 -3 z' fill='%231E847F' stroke='none' opacity='.5'/%3E%3C/g%3E%3C/svg%3E");
+    background-size:contain; background-repeat:no-repeat;
+  }
+  .arabesque::before{ top:10px; right:10px; }
+  .arabesque::after{ bottom:10px; left:10px; transform:rotate(180deg); }
+
+  .card{ background-color:var(--surface); border:1px solid var(--border); } /* background-color (not shorthand) so .zellige pattern survives on hero/footer */
+  /* ---- Mode-aware solids: white text works on turquoise in light mode,
+     but gold/emerald in dark mode need DARK text (4.5:1 rule) ---- */
+  .btn-primary{ background:var(--primary); color:#fff; }
+  html.dark .btn-primary{ color:#1A1405; }
+  .btn-secondary{ background:var(--secondary); color:#fff; }
+  html.dark .btn-secondary{ color:#052E22; }
+  .badge-primary{ background:var(--primary); color:#fff; }
+  html.dark .badge-primary{ color:#1A1405; }
+  .badge-secondary{ background:var(--secondary); color:#fff; }
+  html.dark .badge-secondary{ color:#052E22; }
+  .user-bubble{ background:color-mix(in srgb,var(--primary) 12%,white); border:1px solid var(--border); color:#2D2727; }
+  html.dark .user-bubble{ background:rgba(212,175,55,.14); border-color:rgba(212,175,55,.45); color:#E5E0D8; }
+  .toast-msg{ background:#2D2727; color:#fff; }
+  html.dark .toast-msg{ background:#D4AF37; color:#1A1405; }
+  .muted-t{ color:var(--muted); }
+  .gold-rule{ height:2px; background:linear-gradient(90deg,transparent,var(--gold),transparent); }
+
+  .skeleton{ position:relative; overflow:hidden; background:var(--sand); }
+  .skeleton::after{ content:''; position:absolute; inset:0; background:linear-gradient(90deg,transparent,rgba(255,255,255,.6),transparent); animation:shimmer 1.4s infinite; }
+  @keyframes shimmer{ from{transform:translateX(100%)} to{transform:translateX(-100%)} }
+  .audio-progress{ direction:ltr; }
+  input[type=range]{ accent-color:var(--primary); }
+</style>
+</head>
+<body class="antialiased">
+
+<!-- 8-pointed star symbol -->
+<svg width="0" height="0" class="absolute" aria-hidden="true"><defs>
+<symbol id="star8" viewBox="0 0 40 40"><g fill="none" stroke="currentColor" stroke-width="2"><rect x="10" y="10" width="20" height="20"/><rect x="10" y="10" width="20" height="20" transform="rotate(45 20 20)"/><circle cx="20" cy="20" r="2.5" fill="currentColor" stroke="none"/></g></symbol>
+</defs></svg>
+
+<!-- Floating navbar -->
+<header class="fixed top-4 left-4 right-4 z-50">
+  <nav class="max-w-6xl mx-auto flex items-center justify-between gap-3 card rounded-2xl px-4 sm:px-6 py-3 shadow-sm" aria-label="التنقل الرئيسي">
+    <div class="flex items-center gap-3">
+      <span class="w-10 h-10 grid place-items-center rounded-xl btn-primary" aria-hidden="true">
+        <svg width="22" height="22"><use href="#star8"/></svg>
+      </span>
+      <div>
+        <p class="font-heading font-bold leading-none text-lg">مجلس</p>
+        <p class="text-xs muted-t">دائرة خاصة — طراز أندلسي</p>
+      </div>
+    </div>
+    <div class="hidden md:flex items-center gap-5 text-sm muted-t">
+      <a href="#colors" class="clickable hover:opacity-80 transition-ui">الألوان</a>
+      <a href="#type" class="clickable hover:opacity-80 transition-ui">الخطوط</a>
+      <a href="#components" class="clickable hover:opacity-80 transition-ui">المكونات</a>
+      <a href="#lessons" class="clickable hover:opacity-80 transition-ui">الدروس</a>
+      <a href="#exams" class="clickable hover:opacity-80 transition-ui">الاختبارات</a>
+      <a href="#chat" class="clickable hover:opacity-80 transition-ui">المساعد</a>
+    </div>
+    <div class="flex items-center gap-2">
+      <button id="themeBtn" class="clickable transition-ui text-sm border rounded-xl px-3 py-2 hover:opacity-80" style="border-color:var(--border)" aria-label="تبديل المظهر">
+        <span class="inline-flex items-center gap-2">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8Z"/></svg>
+          <span id="themeLabel">ليلي</span>
+        </span>
+      </button>
+      <a href="#join" class="clickable transition-ui text-sm  rounded-xl px-4 py-2 hover:opacity-90 btn-primary">انضم برمز</a>
+    </div>
+  </nav>
+</header>
+
+<main class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-28 pb-20 space-y-12">
+
+  <!-- Hero with zellige -->
+  <section class="zellige zellige-veil card rounded-3xl px-6 sm:px-12 py-12 text-center space-y-5 overflow-hidden">
+    <div class="flex items-center justify-center gap-3" style="color:var(--gold)" aria-hidden="true">
+      <span class="gold-rule w-16"></span><svg width="26" height="26"><use href="#star8"/></svg><span class="gold-rule w-16"></span>
+    </div>
+    <p class="text-xs tracking-wide muted-t">Reem Kufi للعناوين • Tajawal للمتن • محفوظة محلياً في <span dir="ltr">fonts/</span></p>
+    <h1 class="text-4xl sm:text-6xl font-bold leading-tight">مجلس العلم<br><span class="font-classic font-normal">على الطريقة الأندلسية</span></h1>
+    <p class="muted-t max-w-2xl mx-auto leading-8">عاجي دافئ وتركواز وذهبي عتيق، أقواس حدوة الفرس، نجمة الثمانية، وزخارف أرابيسك — هوية مألوفة لدائرة المسجد، وعصرية في الاستخدام.</p>
+    <ul class="flex items-center justify-center gap-6 flex-wrap text-sm">
+      <li class="inline-flex items-center gap-2"><svg width="16" height="16" style="color:var(--primary)"><use href="#star8"/></svg> عربي أولاً RTL</li>
+      <li class="inline-flex items-center gap-2"><svg width="16" height="16" style="color:var(--primary)"><use href="#star8"/></svg> متجاوب حتى 375px</li>
+      <li class="inline-flex items-center gap-2"><svg width="16" height="16" style="color:var(--primary)"><use href="#star8"/></svg> فاتح / ليلي</li>
+    </ul>
+    <div class="flex items-center justify-center gap-3 flex-wrap">
+      <button onclick="document.getElementById('components').scrollIntoView({behavior:'smooth'})" class="clickable transition-ui  rounded-xl px-6 py-3 hover:opacity-90 btn-primary">استعرض المكونات</button>
+      <button onclick="showToast('هذه معاينة فقط — لم يبدأ التنفيذ بعد')" class="clickable transition-ui rounded-xl px-6 py-3 border hover:opacity-80 card">جرّب التنبيه</button>
+    </div>
+  </section>
+
+  <!-- Star divider -->
+  <div class="flex items-center gap-3" style="color:var(--gold)" aria-hidden="true">
+    <span class="gold-rule flex-1"></span><svg width="22" height="22"><use href="#star8"/></svg><span class="gold-rule flex-1"></span>
+  </div>
+
+  <!-- Colors: light + dark -->
+  <section id="colors" class="card arabesque rounded-2xl p-6 sm:p-8 shadow-sm">
+    <h2 class="text-2xl font-bold mb-1">الألوان — فاتح / ليلي</h2>
+    <p class="text-sm muted-t mb-5">النهار: عاجي وتركواز وطيني. الليل: كحلي عميق وذهبي عتيق. زر التبديل أعلاه يعاين الليل فوراً.</p>
+    <p class="text-sm font-bold mb-2">الوضع الفاتح</p>
+    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
+      <div><div class="h-20 rounded-xl border" style="background:#F1E8D2;border-color:var(--border)"></div><p class="text-xs mt-2 font-bold">بيج BG</p><p class="text-xs muted-t" dir="ltr">#F1E8D2</p></div>
+      <div><div class="h-20 rounded-xl" style="background:#1E847F"></div><p class="text-xs mt-2 font-bold">تركواز Primary</p><p class="text-xs muted-t" dir="ltr">#1E847F</p></div>
+      <div><div class="h-20 rounded-xl" style="background:#C1543D"></div><p class="text-xs mt-2 font-bold">طيني Secondary</p><p class="text-xs muted-t" dir="ltr">#C1543D</p></div>
+      <div><div class="h-20 rounded-xl" style="background:#D4AF37"></div><p class="text-xs mt-2 font-bold">ذهبي Accent</p><p class="text-xs muted-t" dir="ltr">#D4AF37</p></div>
+      <div><div class="h-20 rounded-xl" style="background:#2D2727"></div><p class="text-xs mt-2 font-bold">بني داكن Text</p><p class="text-xs muted-t" dir="ltr">#2D2727</p></div>
+    </div>
+    <p class="text-sm font-bold mb-2">الوضع الليلي</p>
+    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+      <div><div class="h-20 rounded-xl border border-slate-700" style="background:#0F172A"></div><p class="text-xs mt-2 font-bold">كحلي ليلي BG</p><p class="text-xs muted-t" dir="ltr">#0F172A</p></div>
+      <div><div class="h-20 rounded-xl" style="background:#D4AF37"></div><p class="text-xs mt-2 font-bold">ذهبي عتيق Primary</p><p class="text-xs muted-t" dir="ltr">#D4AF37</p></div>
+      <div><div class="h-20 rounded-xl" style="background:#065F46"></div><p class="text-xs mt-2 font-bold">زمرد داكن</p><p class="text-xs muted-t" dir="ltr">#065F46</p></div>
+      <div><div class="h-20 rounded-xl border" style="background:#E5E0D8"></div><p class="text-xs mt-2 font-bold">كريمي Text</p><p class="text-xs muted-t" dir="ltr">#E5E0D8</p></div>
+      <div><div class="h-20 rounded-xl border" style="background:#16213A;border-color:var(--border)"></div><p class="text-xs mt-2 font-bold">سطح ليلي</p><p class="text-xs muted-t" dir="ltr">#16213A</p></div>
+    </div>
+  </section>
+
+  <!-- Typography -->
+  <section id="type" class="card rounded-2xl p-6 sm:p-8 shadow-sm">
+    <h2 class="text-2xl font-bold mb-1">الخطوط — محلية</h2>
+    <p class="text-sm muted-t mb-5">العناوين <b>Reem Kufi</b> (هندسي) مع بديل <b class="font-classic">Amiri</b> (كلاسيكي) — المتن <b>Tajawal</b> ببديل Cairo. كلها في <span dir="ltr">design-system/majlis/fonts/</span> عبر <span dir="ltr">@font-face</span>.</p>
+    <div class="grid md:grid-cols-2 gap-4">
+      <div class="rounded-xl p-5 border" style="border-color:var(--border)">
+        <p class="text-xs muted-t mb-2">Reem Kufi — هندسي أندلسي</p>
+        <p class="font-heading text-3xl font-bold leading-snug">باب الطهارة — الدرس الثالث: صفحات ٤٥ ← ٦٢</p>
+        <p class="font-classic text-xl mt-3 muted-t">وبديل أميري كلاسيكي أنيق للعناوين الوقورة: شرح كتاب الطهارة</p>
+      </div>
+      <div class="rounded-xl p-5 border" style="border-color:var(--border)">
+        <p class="text-xs muted-t mb-2">Tajawal / Cairo — متن نظيف</p>
+        <p class="leading-8 text-[15px]">استمع إلى التسجيل الصوتي، وتابع الصفحات المشروحة، ثم اختبر فهمك. الزخرفة للعناوين فقط حتى لا تُجهد العين في الفقرات الطويلة.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Components -->
+  <section id="components" class="card arabesque rounded-2xl p-6 sm:p-8 shadow-sm space-y-7">
+    <div>
+      <h2 class="text-2xl font-bold mb-1">المكونات بروح أندلسية</h2>
+      <p class="text-sm muted-t">أزرار تركوازية، شارات مزخرفة، وأقواس بدل الزوايا الحادة.</p>
+    </div>
+
+    <div class="flex flex-wrap gap-3">
+      <button class="clickable transition-ui  rounded-xl px-5 py-2.5 hover:opacity-90 btn-primary">أساسي</button>
+      <button class="clickable transition-ui rounded-xl px-5 py-2.5 hover:opacity-90 btn-secondary">ثانوي طيني</button>
+      <button class="clickable transition-ui rounded-xl px-5 py-2.5 border hover:opacity-80 card" style="border-color:var(--gold)">مذهّب</button>
+      <button class="clickable transition-ui text-sm rounded-xl px-5 py-2.5 border border-red-300 text-red-600 hover:bg-red-50">حظر (خطر)</button>
+      <button disabled class="rounded-xl px-5 py-2.5 cursor-not-allowed opacity-50 card border" style="border-color:var(--border)">معطّل</button>
+    </div>
+
+    <div class="space-y-3">
+      <p class="text-sm font-bold">حالات التسجيل — بنجمة الثمانية</p>
+      <div class="flex flex-wrap gap-2 text-xs">
+        <span class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 border" style="border-color:var(--gold);background:color-mix(in srgb,var(--gold) 12%,transparent)"><svg width="12" height="12"><use href="#star8"/></svg> بانتظار pending</span>
+        <span class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 badge-primary">><svg width="12" height="12"><use href="#star8"/></svg> مقبول approved</span>
+        <span class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 border muted-t" style="border-color:var(--border)"><svg width="12" height="12"><use href="#star8"/></svg> مرفوض — يُعاد التقديم</span>
+        <span class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 badge-secondary">><svg width="12" height="12"><use href="#star8"/></svg> محظور blocked</span>
+      </div>
+      <p class="text-sm font-bold pt-2">حالة الدرس / نافذة الاختبار</p>
+      <div class="flex flex-wrap gap-2 text-xs">
+        <span class="rounded-full px-3 py-1 badge-primary">>جاهز ready</span>
+        <span class="rounded-full px-3 py-1 border" style="border-color:var(--gold)">معالجة processing</span>
+        <span class="rounded-full px-3 py-1 badge-secondary">>فشل — أعد المحاولة</span>
+        <span class="rounded-full px-3 py-1 border muted-t" style="border-color:var(--border)">مفتوح open</span>
+        <span class="rounded-full px-3 py-1 border muted-t" style="border-color:var(--border)">قادم upcoming</span>
+        <span class="rounded-full px-3 py-1" style="background:var(--sand)">مغلق closed</span>
+      </div>
+    </div>
+
+    <div id="join" class="grid md:grid-cols-2 gap-4">
+      <form onsubmit="event.preventDefault(); showToast('تم إرسال طلب الانضمام — بانتظار مراجعة الشيخ')" class="arch-sm arch-frame card p-6 pt-10 space-y-3">
+        <h3 class="font-bold text-center">انضم برمز الدورة</h3>
+        <div class="flex justify-center" style="color:var(--gold)" aria-hidden="true"><svg width="20" height="20"><use href="#star8"/></svg></div>
+        <div>
+          <label for="code" class="text-sm font-bold block mb-1">رمز الدعوة</label>
+          <input id="code" dir="ltr" placeholder="مثال: KQ7X-2P9A" class="w-full rounded-xl px-4 py-2.5 card border placeholder:opacity-60" style="border-color:var(--border)" required>
+        </div>
+        <div>
+          <label for="dname" class="text-sm font-bold block mb-1">الاسم الظاهر للشيخ</label>
+          <input id="dname" placeholder="الاسم الكامل" class="w-full rounded-xl px-4 py-2.5 card border placeholder:opacity-60" style="border-color:var(--border)" required>
+        </div>
+        <button class="clickable transition-ui w-full  rounded-xl py-2.5 hover:opacity-90 btn-primary">إرسال الطلب</button>
+      </form>
+      <div class="arch-sm arch-frame card p-6 pt-10 space-y-3">
+        <h3 class="font-bold text-center">توليد رمز (للمعلم)</h3>
+        <p class="text-sm muted-t text-center">يظهر الرمز الخام مرة واحدة — انسخه فوراً.</p>
+        <div class="flex gap-2" dir="ltr">
+          <code id="rawCode" class="flex-1 rounded-xl px-4 py-2.5 text-sm text-center" style="background:var(--text);color:var(--bg)">MX4K-Q2T8</code>
+          <button onclick="navigator.clipboard && navigator.clipboard.writeText('MX4K-Q2T8'); showToast('تم نسخ الرمز — لن يظهر مرة أخرى')" class="clickable transition-ui rounded-xl px-4 border hover:opacity-80" style="border-color:var(--gold)">نسخ</button>
+        </div>
+        <p class="text-xs muted-t text-center">8 أحرف • 7 أيام • 50 استخداماً • 5 نشطة كحد أقصى</p>
+        <button onclick="toggleSkeleton()" class="clickable transition-ui text-sm rounded-xl px-4 py-2 border hover:opacity-80 mx-auto block" style="border-color:var(--border)">معاينة التحميل</button>
+        <div id="skel" class="hidden space-y-2"><div class="skeleton h-4 rounded"></div><div class="skeleton h-4 rounded w-2/3"></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Lessons with horseshoe arches -->
+  <section id="lessons" class="space-y-4">
+    <div class="flex items-center gap-3" style="color:var(--gold)" aria-hidden="true"><span class="gold-rule flex-1"></span><svg width="22" height="22"><use href="#star8"/></svg><span class="text-sm font-heading" style="color:var(--text)">الدروس — أقواس حدوة الفرس</span><svg width="22" height="22"><use href="#star8"/></svg><span class="gold-rule flex-1"></span></div>
+    <div class="grid md:grid-cols-2 gap-5">
+      <article class="arch arch-frame card p-6 pt-24 shadow-sm space-y-3 text-center">
+        <div class="arch-img mx-auto -mt-32 mb-2 w-44 h-56" style="background:linear-gradient(160deg,var(--primary),var(--primary-ink))" role="img" aria-label="زخرفة الدرس">
+          <div class="w-full h-full grid place-items-center zellige" style="color:var(--gold)"><svg width="54" height="54"><use href="#star8"/></svg></div>
+        </div>
+        <span class="inline-flex items-center gap-1.5 text-xs rounded-full px-3 py-1 badge-primary mx-auto"><svg width="12" height="12"><use href="#star8"/></svg> جاهز ready</span>
+        <h3 class="font-bold text-xl">الدرس ٣ — باب الطهارة</h3>
+        <p class="text-xs muted-t">الصفحات ٤٥ ← ٦٢ • ١٢ محرم ١٤٤٧</p>
+        <div class="rounded-xl p-4 space-y-2 border text-right" style="border-color:var(--border)">
+          <div class="flex items-center gap-3">
+            <button id="playBtn" class="clickable transition-ui w-11 h-11 shrink-0 grid place-items-center rounded-full  hover:opacity-90 btn-primary" aria-label="تشغيل / إيقاف">
+              <svg id="playIcon" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
+            </button>
+            <div class="flex-1 audio-progress">
+              <input id="seek" type="range" min="0" max="100" value="32" class="w-full clickable" aria-label="التقديم في التسجيل">
+              <div class="flex justify-between text-[11px] muted-t" dir="ltr"><span id="tCur">24:10</span><span>75:30</span></div>
+            </div>
+          </div>
+          <p class="text-[11px] muted-t">بث Range عبر رابط موقّع قصير العمر.</p>
+        </div>
+        <div class="flex gap-2">
+          <button class="clickable transition-ui flex-1 rounded-xl py-2 text-sm border hover:opacity-80" style="border-color:var(--border)">ملف الدرس</button>
+          <button class="clickable transition-ui flex-1  rounded-xl py-2 text-sm hover:opacity-90 btn-primary">التفاصيل</button>
+        </div>
+      </article>
+
+      <article class="arch arch-frame card p-6 pt-24 shadow-sm space-y-3 text-center opacity-95">
+        <div class="arch-img mx-auto -mt-32 mb-2 w-44 h-56 grid place-items-center" style="background:linear-gradient(160deg,var(--secondary),#7A2E1F);color:var(--gold)" role="img" aria-label="قيد المعالجة">
+          <svg width="54" height="54"><use href="#star8"/></svg>
+        </div>
+        <span class="inline-flex items-center gap-1.5 text-xs rounded-full px-3 py-1 border mx-auto" style="border-color:var(--gold)"><svg width="12" height="12"><use href="#star8"/></svg> معالجة processing</span>
+        <h3 class="font-bold text-xl">الدرس ٤ — باب الصلاة</h3>
+        <p class="text-xs muted-t">الصفحات ٦٣ ← ٧٨ • قيد الرفع</p>
+        <p class="text-sm muted-t leading-7">رفع مباشر برابط مؤقت ثم تأكيد — الفشل يُعاد برابط جديد.</p>
+        <div class="h-2 rounded-full overflow-hidden audio-progress" style="background:var(--sand)"><div class="h-full rounded-full" style="width:62%;background:var(--secondary)"></div></div>
+        <button class="clickable transition-ui w-full rounded-xl py-2 text-sm border hover:opacity-80" style="border-color:var(--border)">إعادة المحاولة برابط جديد</button>
+      </article>
+    </div>
+  </section>
+
+  <!-- Exams + gradebook -->
+  <section id="exams" class="card arabesque rounded-2xl p-6 sm:p-8 shadow-sm space-y-6">
+    <h2 class="text-2xl font-bold">الاختبارات — اكتشاف + مؤقّت + سجل</h2>
+    <div class="grid md:grid-cols-2 gap-4">
+      <div class="rounded-xl p-5 space-y-3 border" style="border-color:var(--border)">
+        <div class="flex items-center justify-between">
+          <h3 class="font-bold">اختبار الباب الأول</h3>
+          <span class="text-xs rounded-full px-3 py-1 badge-primary">>مفتوح</span>
+        </div>
+        <p class="text-sm muted-t">متبقٍ: 1 من 2 • النشر بعد موافقة الشيخ</p>
+        <div class="flex items-center gap-2 text-sm rounded-xl px-4 py-2.5 border" style="border-color:var(--border);background:var(--sand)">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+          <span>المتبقي: <b id="timer" dir="ltr">29:59</b></span>
+          <button onclick="resetTimer()" class="clickable transition-ui mr-auto text-xs hover:opacity-70" style="color:var(--primary)">إعادة (تجريبي)</button>
+        </div>
+        <button onclick="showToast('بدء المحاولة محمي من الخادم: النافذة + العدد + محاولة جارية واحدة')" class="clickable transition-ui w-full  rounded-xl py-2.5 hover:opacity-90 btn-primary">بدء المحاولة</button>
+      </div>
+      <div class="rounded-xl p-5 space-y-3 border" style="border-color:var(--border)">
+        <h3 class="font-bold">سجل الدرجات (للمعلم)</h3>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead><tr class="text-right text-xs muted-t border-b" style="border-color:var(--border)">
+              <th class="py-2 pl-3">الطالب</th><th class="py-2 pl-3">الدرجة</th><th class="py-2 pl-3">الحالة</th><th class="py-2">نشر</th>
+            </tr></thead>
+            <tbody>
+              <tr class="border-b transition-ui" style="border-color:var(--border)"><td class="py-2 pl-3">عبد الله</td><td class="py-2 pl-3" dir="ltr">8 / 10</td><td class="py-2 pl-3" style="color:var(--primary)">مصحح</td><td class="py-2 text-xs">منشور</td></tr>
+              <tr><td class="py-2 pl-3">أم سالم</td><td class="py-2 pl-3" dir="ltr">— / 10</td><td class="py-2 pl-3" style="color:var(--secondary)">مقالي بانتظار التصحيح</td><td class="py-2 text-xs">بانتظار النشر</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <button onclick="showToast('التصدير CSV عبر Blob مع اسم الملف من الخادم')" class="clickable transition-ui w-full rounded-xl py-2 text-sm border hover:opacity-80" style="border-color:var(--gold)">تصدير CSV</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Chat -->
+  <section id="chat" class="card rounded-2xl p-6 sm:p-8 shadow-sm space-y-4">
+    <div class="flex items-center justify-between flex-wrap gap-2">
+      <h2 class="text-2xl font-bold">المساعد — من الدروس فقط مع الاستشهاد</h2>
+      <span class="text-xs rounded-full px-3 py-1 border" style="border-color:var(--gold)">المتبقي اليوم: <b id="quota">27 / 30</b></span>
+    </div>
+    <div class="rounded-xl p-4 space-y-3 border" style="border-color:var(--border);background:color-mix(in srgb,var(--sand) 45%,transparent)">
+      <div class="flex justify-end"><p class="user-bubble rounded-2xl rounded-bl-md px-4 py-2.5 text-sm max-w-[85%]">ما حكم المسح على الخفين مما شُرح في الدرس الثالث؟</p></div>
+      <div class="flex justify-start"><div class="card rounded-2xl rounded-br-md px-4 py-2.5 text-sm max-w-[85%] space-y-2 border" style="border-color:var(--border)">
+        <p>يجوز المسح يوماً وليلة للمقيم كما ورد في الشرح.</p>
+        <p class="text-xs muted-t border-r-2 pr-2" style="border-color:var(--gold)">الاستشهاد: الدرس ٣ — باب الطهارة • صفحات ٤٥–٦٢</p>
+      </div></div>
+      <div class="flex justify-start"><p class="card rounded-2xl rounded-br-md px-4 py-2.5 text-sm max-w-[85%] border" style="border-color:var(--gold)">لم يُشرح هذا في الدروس — اسأل عما ورد في التسجيلات.</p></div>
+    </div>
+    <form onsubmit="event.preventDefault(); askDemo(this)" class="flex gap-2">
+      <label for="q" class="sr-only">اسأل من الدروس</label>
+      <input id="q" placeholder="اسأل بالعربية من شرح الشيخ…" class="flex-1 rounded-xl px-4 py-3 card border placeholder:opacity-60" style="border-color:var(--border)">
+      <button class="clickable transition-ui  rounded-xl px-6 hover:opacity-90 btn-primary">إرسال</button>
+    </form>
+  </section>
+
+  <!-- Footer with zellige -->
+  <footer class="zellige zellige-veil card rounded-3xl px-6 py-10 text-center space-y-3">
+    <div class="flex items-center justify-center gap-3" style="color:var(--gold)" aria-hidden="true"><span class="gold-rule w-20"></span><svg width="24" height="24"><use href="#star8"/></svg><span class="gold-rule w-20"></span></div>
+    <p class="text-sm muted-t">SVG فقط — لا إيموجي • انتقالات 200ms • تباين ≥ 4.5:1 • `prefers-reduced-motion` • ‏375 / 768 / 1024 / 1440 • خطوط محلية <span dir="ltr">fonts/</span></p>
+    <p class="font-heading text-lg">MAJLIS — دائرة خاصة</p>
+  </footer>
+</main>
+
+<div id="toast" role="status" class="fixed bottom-6 right-1/2 translate-x-1/2 z-[60] hidden">
+  <p id="toastMsg" class="toast-msg text-sm rounded-xl px-5 py-3 shadow-lg"></p>
+</div>
+
+<script>
+  const root = document.documentElement;
+  const themeLabel = document.getElementById('themeLabel');
+  document.getElementById('themeBtn').addEventListener('click', () => {
+    const dark = root.classList.toggle('dark');
+    themeLabel.textContent = dark ? 'نهاري' : 'ليلي';
+  });
+  let toastT;
+  function showToast(msg){
+    const t = document.getElementById('toast');
+    document.getElementById('toastMsg').textContent = msg;
+    t.classList.remove('hidden');
+    clearTimeout(toastT);
+    toastT = setTimeout(()=> t.classList.add('hidden'), 2600);
+  }
+  function toggleSkeleton(){ document.getElementById('skel').classList.toggle('hidden'); }
+  let playing = false, sec = 24*60+10;
+  const playBtn = document.getElementById('playBtn');
+  const playIcon = document.getElementById('playIcon');
+  const seek = document.getElementById('seek');
+  const tCur = document.getElementById('tCur');
+  playBtn.addEventListener('click', () => {
+    playing = !playing;
+    playIcon.innerHTML = playing ? '<path d="M6 5h4v14H6zM14 5h4v14h-4z"/>' : '<path d="M8 5v14l11-7z"/>';
+    showToast(playing ? 'تشغيل تجريبي — البث الحقيقي عبر Range' : 'إيقاف مؤقت');
+  });
+  seek.addEventListener('input', () => {
+    const total = 75*60+30;
+    sec = Math.round(total * seek.value / 100);
+    tCur.textContent = String(Math.floor(sec/60)).padStart(2,'0') + ':' + String(sec%60).padStart(2,'0');
+  });
+  let remain = 29*60+59;
+  const timerEl = document.getElementById('timer');
+  setInterval(() => {
+    if (remain > 0) remain--;
+    timerEl.textContent = String(Math.floor(remain/60)).padStart(2,'0') + ':' + String(remain%60).padStart(2,'0');
+  }, 1000);
+  function resetTimer(){ remain = 29*60+59; showToast('أُعيد المؤقت التجريبي — الحقيقي من expires_at'); }
+  let left = 27;
+  function askDemo(form){
+    const input = document.getElementById('q');
+    if(!input.value.trim()) return;
+    if(left <= 0){ showToast('انتهت حصتك اليومية (30/30)'); return; }
+    left--;
+    document.getElementById('quota').textContent = left + ' / 30';
+    showToast('معاينة فقط — الحقيقي من نصوص الدروس مع استشهاد');
+    input.value = '';
+  }
+</script>
+</body>
+</html>

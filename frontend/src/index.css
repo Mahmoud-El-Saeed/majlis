@@ -1,0 +1,306 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-heading: "Reem Kufi", "Amiri", serif;
+  --font-body: "Tajawal", "Cairo", sans-serif;
+  --color-ivory: #f1e8d2;
+  --color-turq: #1e847f;
+  --color-terra: #c1543d;
+  --color-gold: #d4af37;
+  --color-night: #0f172a;
+  --color-cream: #e5e0d8;
+  --color-brown: #2d2727;
+  --color-sand: #efe7d6;
+}
+
+/* ---- Local fonts (bundled, never CDN) ---- */
+@font-face {
+  font-family: "Reem Kufi";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("./assets/fonts/ReemKufi-Regular.ttf") format("truetype");
+}
+@font-face {
+  font-family: "Reem Kufi";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("./assets/fonts/ReemKufi-Bold.ttf") format("truetype");
+}
+@font-face {
+  font-family: "Amiri";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("./assets/fonts/Amiri-Regular.ttf") format("truetype");
+}
+@font-face {
+  font-family: "Tajawal";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("./assets/fonts/Tajawal-Regular.ttf") format("truetype");
+}
+@font-face {
+  font-family: "Tajawal";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("./assets/fonts/Tajawal-Bold.ttf") format("truetype");
+}
+@font-face {
+  font-family: "Cairo";
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url("./assets/fonts/Cairo.ttf") format("truetype");
+}
+
+:root {
+  --bg: #f1e8d2;
+  --surface: #fffdf8;
+  --primary: #1e847f;
+  --primary-ink: #0c3b39;
+  --secondary: #c1543d;
+  --gold: #d4af37;
+  --text: #2d2727;
+  --muted: #6b5f56;
+  --border: #e4d9c2;
+  --sand: #efe7d6;
+}
+html.dark {
+  --bg: #0f172a;
+  --surface: #16213a;
+  --primary: #d4af37;
+  --primary-ink: #3a2e08;
+  --secondary: #34d399;
+  --gold: #d4af37;
+  --text: #e5e0d8;
+  --muted: #b8b2a6;
+  --border: #2b3a55;
+  --sand: #1b2742;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+body {
+  font-family: "Tajawal", "Cairo", sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  margin: 0;
+}
+h1,
+h2,
+h3,
+.font-heading {
+  font-family: "Reem Kufi", "Amiri", serif;
+}
+.font-classic {
+  font-family: "Amiri", serif;
+}
+.transition-ui {
+  transition:
+    background-color 200ms,
+    color 200ms,
+    border-color 200ms,
+    box-shadow 200ms,
+    opacity 200ms;
+}
+.clickable {
+  cursor: pointer;
+}
+button,
+a,
+[role="button"],
+input[type="submit"] {
+  cursor: pointer;
+}
+button:disabled,
+input:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ---- Zellige tessellation ---- */
+.zellige {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='72' height='72' viewBox='0 0 72 72'%3E%3Cg fill='none' stroke='%23587F77' stroke-width='1.6'%3E%3Crect x='22' y='22' width='28' height='28'/%3E%3Crect x='22' y='22' width='28' height='28' transform='rotate(45 36 36)'/%3E%3Ccircle cx='36' cy='36' r='3'/%3E%3Ccircle cx='0' cy='0' r='8'/%3E%3Ccircle cx='72' cy='0' r='8'/%3E%3Ccircle cx='0' cy='72' r='8'/%3E%3Ccircle cx='72' cy='72' r='8'/%3E%3C/g%3E%3C/svg%3E");
+  background-size: 80px 80px;
+}
+.zellige-veil {
+  position: relative;
+}
+.zellige-veil::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--bg);
+  opacity: 0.87;
+  pointer-events: none;
+}
+html.dark .zellige-veil::before {
+  background: #0f172a;
+  opacity: 0.94;
+}
+.zellige-veil > * {
+  position: relative;
+}
+html.dark .zellige {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='72' height='72' viewBox='0 0 72 72'%3E%3Cg fill='none' stroke='%23D4AF37' stroke-width='1.2'%3E%3Crect x='22' y='22' width='28' height='28'/%3E%3Crect x='22' y='22' width='28' height='28' transform='rotate(45 36 36)'/%3E%3Ccircle cx='36' cy='36' r='3'/%3E%3C/g%3E%3C/svg%3E");
+}
+
+/* ---- Horseshoe arch ---- */
+.arch {
+  border-radius: 150px 150px 20px 20px;
+}
+.arch-sm {
+  border-radius: 90px 90px 14px 14px;
+}
+.arch-frame {
+  position: relative;
+  border: 1.5px solid var(--border);
+}
+.arch-frame::after {
+  content: "";
+  position: absolute;
+  inset: 8px;
+  border: 1px solid var(--gold);
+  opacity: 0.55;
+  border-radius: inherit;
+  pointer-events: none;
+}
+.arch-img {
+  border-radius: 120px 120px 16px 16px;
+  overflow: hidden;
+  border: 1.5px solid var(--gold);
+}
+
+/* ---- Arabesque corners ---- */
+.arabesque {
+  position: relative;
+}
+.arabesque::before,
+.arabesque::after {
+  content: "";
+  position: absolute;
+  width: 54px;
+  height: 54px;
+  opacity: 0.5;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 54 54'%3E%3Cg fill='none' stroke='%23D4AF37' stroke-width='1.4'%3E%3Cpath d='M4 50 C 4 26, 26 4, 50 4'/%3E%3Cpath d='M12 50 C 12 30, 30 12, 50 12'/%3E%3Ccircle cx='10' cy='44' r='2.5' fill='%23D4AF37'/%3E%3Ccircle cx='44' cy='10' r='2.5' fill='%23D4AF37'/%3E%3Cpath d='M27 20 l3 5 5 3 -5 3 -3 5 -3 -5 -5 -3 5 -3 z' fill='%231E847F' stroke='none' opacity='.5'/%3E%3C/g%3E%3C/svg%3E");
+  background-size: contain;
+  background-repeat: no-repeat;
+}
+.arabesque::before {
+  top: 10px;
+  right: 10px;
+}
+.arabesque::after {
+  bottom: 10px;
+  left: 10px;
+  transform: rotate(180deg);
+}
+
+/* MUST use background-color (never shorthand) so zellige survives */
+.card {
+  background-color: var(--surface);
+  border: 1px solid var(--border);
+}
+
+/* ---- Mode-aware solids (never raw text-white on primary) ---- */
+.btn-primary {
+  background: var(--primary);
+  color: #fff;
+}
+html.dark .btn-primary {
+  color: #1a1405;
+}
+.btn-secondary {
+  background: var(--secondary);
+  color: #fff;
+}
+html.dark .btn-secondary {
+  color: #052e22;
+}
+.badge-primary {
+  background: var(--primary);
+  color: #fff;
+}
+html.dark .badge-primary {
+  color: #1a1405;
+}
+.badge-secondary {
+  background: var(--secondary);
+  color: #fff;
+}
+html.dark .badge-secondary {
+  color: #052e22;
+}
+.user-bubble {
+  background: color-mix(in srgb, var(--primary) 12%, white);
+  border: 1px solid var(--border);
+  color: #2d2727;
+}
+html.dark .user-bubble {
+  background: rgba(212, 175, 55, 0.14);
+  border-color: rgba(212, 175, 55, 0.45);
+  color: #e5e0d8;
+}
+.toast-msg {
+  background: #2d2727;
+  color: #fff;
+}
+html.dark .toast-msg {
+  background: #d4af37;
+  color: #1a1405;
+}
+.muted-t {
+  color: var(--muted);
+}
+.gold-rule {
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--gold), transparent);
+}
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background: var(--sand);
+}
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.6), transparent);
+  animation: shimmer 1.4s infinite;
+}
+@keyframes shimmer {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(-100%);
+  }
+}
+.audio-progress {
+  direction: ltr;
+}
+input[type="range"] {
+  accent-color: var(--primary);
+}
