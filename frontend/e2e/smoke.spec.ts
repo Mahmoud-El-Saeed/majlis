@@ -222,11 +222,12 @@ test('live: signup → join → approve → listen → exam → grade', async ({
   expect(csv.ok()).toBeTruthy()
   expect((await csv.text()).length).toBeGreaterThan(0)
 
-  // Student dashboard via UI (proves Bearer wiring + Join box present).
+  // Student dashboard via UI (proves Bearer wiring + Join FAB → modal).
   await page.goto('/login')
   await page.getByLabel('البريد الإلكتروني').fill(studentEmail)
   await page.getByLabel('كلمة المرور').fill(password)
   await page.getByRole('button', { name: 'تسجيل الدخول' }).click()
   await expect(page).toHaveURL(/\/dashboard/, { timeout: 15_000 })
-  await expect(page.getByText('انضم برمز الكتاب')).toBeVisible()
+  await page.getByRole('button', { name: 'انضم برمز السلسلة' }).click()
+  await expect(page.getByRole('dialog', { name: 'انضم برمز السلسلة' })).toBeVisible()
 })

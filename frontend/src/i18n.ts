@@ -14,10 +14,10 @@ export const str = {
   fullName: 'الاسم الكامل',
   verify: 'تفعيل الحساب',
   reset: 'استعادة كلمة المرور',
-  joinWithCode: 'انضم برمز الكتاب',
-  joinPlaceholder: 'أدخل رمز الكتاب',
+  joinWithCode: 'انضم برمز السلسلة',
+  joinPlaceholder: 'أدخل رمز السلسلة',
   join: 'انضم',
-  myCourses: 'كتبي',
+  myCourses: 'سلاسلي',
   pendingWait: 'طلبك بانتظار مراجعة الشيخ',
   lessons: 'الدروس',
   exams: 'الاختبارات',
@@ -50,19 +50,44 @@ export const str = {
   notFound: 'غير موجود (404)',
   forbidden: 'لا صلاحية (403)',
   unauthorized: 'سجّل الدخول أولًا (401)',
+  // Ticket 16 backend messages.
+  kindFixed: 'نوع السلسلة ثابت منذ الإنشاء — لا يمكن تغيير الكتاب',
+  pagesBookOnly: 'الصفحات لسلسلة الكتاب فقط',
+  badFormat: 'صيغة غير مدعومة — المسموح مذكور في الرسالة',
+  fileTooLarge: 'الملف كبير (أقصى 100MB) — يفضل ضغطه ثم إعادة المحاولة',
+  mainBookOnly: 'الكتاب الأساسي لسلسلة الكتاب فقط',
+  invalidCredentials: 'البريد أو كلمة المرور غير صحيحة — تحقق وحاول مجددًا',
+  unverifiedLogin: 'حسابك غير مفعّل — فعّله من الرابط في بريدك',
+  accountDisabled: 'الحساب موقوف — تواصل مع الإدارة',
+  emailRegistered: 'هذا البريد مسجل بالفعل — سجّل الدخول',
+  search: 'بحث',
+  clearSearch: 'مسح البحث',
+  noResults: 'لا نتائج مطابقة',
+  resultCount: 'عدد النتائج',
+  itemNumber: 'رقم',
+  lessonNumber: 'الدرس رقم',
 } as const
 
 // Backend English detail → Arabic UI message (pass-through fallback keeps English).
 const detailMap: Array<[RegExp, string]> = [
   [/too many requests/i, str.tooMany],
+  [/incorrect email or password/i, str.invalidCredentials],
+  [/verify your email/i, str.unverifiedLogin],
+  [/account disabled/i, str.accountDisabled],
+  [/already registered/i, str.emailRegistered],
   [/not authenticated|invalid.*token|expired/i, str.unauthorized],
   [/not (a )?member|forbidden|not enrolled/i, str.forbidden],
   [/not found/i, str.notFound],
+  [/keeps its book|cannot gain a book/i, str.kindFixed],
+  [/only allowed on book-based courses/i, str.pagesBookOnly],
+  [/attachments are supported/i, str.badFormat],
+  [/too large/i, str.fileTooLarge],
+  [/have a main book/i, str.mainBookOnly],
 ]
 
 export function localizeDetail(detail: string): string {
   for (const [re, ar] of detailMap) {
     if (re.test(detail)) return ar
   }
-  return detail
+  return 'تعذّر — حاول مجددًا'
 }

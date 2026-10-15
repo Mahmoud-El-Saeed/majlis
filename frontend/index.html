@@ -5,6 +5,25 @@
     <link rel="icon" type="image/svg+xml" href="/src/assets/logo-star.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>مجلس — Majlis</title>
+    <script>
+      // Ticket 16: apply the stored theme before first paint (stored choice
+      // wins, otherwise the OS preference on first visit, otherwise light).
+      (function () {
+        try {
+          var saved = localStorage.getItem('mj_theme')
+          var dark =
+            saved === 'dark'
+              ? true
+              : saved === 'light'
+                ? false
+                : window.matchMedia &&
+                  window.matchMedia('(prefers-color-scheme: dark)').matches
+          if (dark) document.documentElement.classList.add('dark')
+        } catch (e) {
+          /* light default */
+        }
+      })()
+    </script>
   </head>
   <body>
     <div id="root"></div>

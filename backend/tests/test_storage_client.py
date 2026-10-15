@@ -27,7 +27,7 @@ class StubS3:
     async def head_object(self, Bucket: str, Key: str) -> dict:
         if self._head_error is not None:
             raise ClientError(self._head_error, "HeadObject")
-        return {}
+        return {"ContentLength": 104857600}
 
 
 def _client(stub: StubS3) -> Aioboto3StorageClient:
@@ -87,3 +87,9 @@ async def test_object_exists_head_semantics():
     assert await _client(StubS3()).object_exists("a") is True
     missing = StubS3(head_error={"Error": {"Code": "404"}})
     assert await _client(missing).object_exists("a") is False
+
+
+async def test_object_size_returns_content_length_or_none():
+    assert await _client(StubS3()).object_size("a") == 104857600
+    missing = StubS3(head_error={"Error": {"Code": "NoSuchKey"}})
+    assert await _client(missing).object_size("a") is None

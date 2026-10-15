@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { ApiError } from '../api/client'
 import { api } from '../api/http'
 import { useAuth } from '../features/auth/AuthContext'
@@ -26,10 +26,18 @@ export function AuthCard({ title, children }: { title: string; children: React.R
 export function LoginPage() {
   const { login } = useAuth()
   const nav = useNavigate()
+  const loc = useLocation() as { state?: { from?: unknown } }
   const { toast } = useToast()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [err, setErr] = useState<string | null>(null)
+  const [verifyLink, setVerifyLink] = useState(false)
+
+  // Preserve deep links (e.g. shared lesson/exam URLs) across login.
+  const from =
+    typeof loc.state?.from === 'string' && loc.state.from.startsWith('/') && !loc.state.from.startsWith('//')
+      ? loc.state.from
+      : '/dashboard'
 
   return (
     <AuthCard title={str.login}>
@@ -37,12 +45,15 @@ export function LoginPage() {
         onSubmit={async (e) => {
           e.preventDefault()
           setErr(null)
+          setVerifyLink(false)
           try {
             await login(email, password)
-            nav('/dashboard')
+            nav(from, { replace: true })
           } catch (ex) {
+            const raw = ex instanceof ApiError ? ex.detail : ''
             const msg = ex instanceof ApiError ? localizeDetail(ex.detail) : 'خطأ'
             setErr(msg)
+            setVerifyLink(/verify your email/i.test(raw))
             if (ex instanceof ApiError && ex.status === 429) toast(msg)
           }
         }}
@@ -53,7 +64,11 @@ export function LoginPage() {
             type="email"
             required
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            onChange={(e) => {
+              setEmail(e.target.value)
+              setErr(null)
+              setVerifyLink(false)
+            }}
             className={fieldCls}
             style={fieldStyle}
           />
@@ -64,15 +79,32 @@ export function LoginPage() {
             type="password"
             required
             value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            onChange={(e) => {
+              setPassword(e.target.value)
+              setErr(null)
+              setVerifyLink(false)
+            }}
             className={fieldCls}
             style={fieldStyle}
           />
         </label>
         {err && (
-          <p role="alert" className="mb-3 text-sm" style={{ color: 'var(--secondary)' }}>
-            {err}
-          </p>
+          <div role="alert" className="card mb-3 rounded-2xl p-3 text-sm" style={{ borderColor: 'var(--secondary)' }}>
+            <p className="font-bold" style={{ color: 'var(--secondary)' }}>
+              تعذّر تسجيل الدخول
+            </p>
+            <p className="mt-1">{err}</p>
+            {verifyLink && (
+              <p className="mt-2">
+                <Link
+                  to={`/verify?email=${encodeURIComponent(email.trim())}`}
+                  className="btn-primary transition-ui inline-block rounded-xl px-4 py-1.5"
+                >
+                  إلى صفحة التفعيل
+                </Link>
+              </p>
+            )}
+          </div>
         )}
         <button type="submit" className={btnPrimary}>
           {str.login}
@@ -103,7 +135,12 @@ export function SignupPage() {
   return (
     <AuthCard title={str.signup}>
       {done ? (
-        <p role="status">تم إنشاء الحساب — تحقق من بريدك لتفعيل الحساب ثم سجّل الدخول.</p>
+        <>
+          <p role="status">تم إنشاء الحساب — تحقق من بريدك لتفعيل الحساب ثم سجّل الدخول.</p>
+          <Link to="/verify" className="btn-primary transition-ui mt-4 inline-block rounded-xl px-6 py-2">
+            إلى التفعيل
+          </Link>
+        </>
       ) : (
         <form
           onSubmit={async (e) => {
@@ -163,19 +200,36 @@ export function VerifyPage() {
   const [state, setState] = useState<'idle' | 'ok' | 'fail'>('idle')
   const [msg, setMsg] = useState('')
   const [token, setToken] = useState(() => new URLSearchParams(window.location.search).get('token') ?? '')
+  const [hintEmail] = useState(() => new URLSearchParams(window.location.search).get('email') ?? '')
+  const autoTried = useRef(false)
+
+  const submitToken = useCallback(async (t: string) => {
+    try {
+      await api.post('/auth/verify', { token: t })
+      setState('ok')
+    } catch (ex) {
+      setState('fail')
+      setMsg(ex instanceof ApiError ? localizeDetail(ex.detail) : 'انتهت صلاحية الرابط أو غير صالح')
+    }
+  }, [])
+
+  // Email links carry ?token= — activate immediately without an extra click.
+  useEffect(() => {
+    if (token && !autoTried.current) {
+      autoTried.current = true
+      void submitToken(token)
+    }
+  }, [token, submitToken])
 
   return (
     <AuthCard title={str.verify}>
+      {hintEmail && state !== 'ok' && (
+        <p className="muted-t mb-3 text-sm">رمز التفعيل المرسل إلى <span dir="ltr">{hintEmail}</span></p>
+      )}
       <form
         onSubmit={async (e) => {
           e.preventDefault()
-          try {
-            await api.post('/auth/verify', { token })
-            setState('ok')
-          } catch (ex) {
-            setState('fail')
-            setMsg(ex instanceof ApiError ? localizeDetail(ex.detail) : 'انتهت صلاحية الرابط أو غير صالح')
-          }
+          await submitToken(token)
         }}
       >
         <label className="mb-4 block">

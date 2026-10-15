@@ -6,7 +6,7 @@ from app.models.user import User
 from app.repositories.course_repository import course_repository
 from app.repositories.lesson_repository import lesson_repository
 from app.schemas.lessons import LessonCreateIn, LessonUpdateIn
-from app.services.course_service import CourseNotFound, can_view, can_write
+from app.services.course_service import CourseNotFound, can_view, can_write, is_book_based
 
 
 class LessonError(Exception):
@@ -34,9 +34,15 @@ def _check_media_type(value: str | None) -> None:
         raise LessonError("Only audio lessons are supported in V1.")
 
 
-def _check_pages(pages_from: int | None, pages_to: int | None) -> None:
+def _check_pages(
+    course: Course, pages_from: int | None, pages_to: int | None
+) -> None:
     if pages_from is not None and pages_to is not None and pages_from > pages_to:
         raise LessonError("pages_from must be <= pages_to.")
+    # Ticket 16: pages range is meaningless without a book — frontend hides
+    # the inputs for general courses; the backend rejects any bypass.
+    if not is_book_based(course) and (pages_from is not None or pages_to is not None):
+        raise LessonError("Pages range is only allowed on book-based courses.")
 
 
 async def create_lesson(
@@ -46,10 +52,11 @@ async def create_lesson(
     if not can_write(actor, course):
         raise LessonForbidden("Not authorized.")
     _check_media_type(data.media_type)
-    _check_pages(data.pages_from, data.pages_to)
+    _check_pages(course, data.pages_from, data.pages_to)
     lesson = Lesson(
         course_id=course.id,
         title=data.title.strip(),
+        description=data.description,
         lesson_date=data.lesson_date,
         pages_from=data.pages_from,
         pages_to=data.pages_to,
@@ -108,11 +115,20 @@ async def update_lesson(
         raise LessonForbidden("Not authorized.")
     _check_media_type(data.media_type)
     # Partial-update pages guard: compare the merged range, not just payload.
-    merged_from = data.pages_from if data.pages_from is not None else lesson.pages_from
-    merged_to = data.pages_to if data.pages_to is not None else lesson.pages_to
-    _check_pages(merged_from, merged_to)
+    # Pre-16 general lessons may hold stored pages ("kept but hidden"): edits
+    # that leave pages untouched stay allowed (stored ranges already satisfy
+    # the DB CHECK); only explicit pages writes on a general course reject.
+    if not is_book_based(course):
+        if data.pages_from is not None or data.pages_to is not None:
+            raise LessonError("Pages range is only allowed on book-based courses.")
+    else:
+        merged_from = data.pages_from if data.pages_from is not None else lesson.pages_from
+        merged_to = data.pages_to if data.pages_to is not None else lesson.pages_to
+        _check_pages(course, merged_from, merged_to)
     if data.title is not None:
         lesson.title = data.title.strip()
+    if data.description is not None:
+        lesson.description = data.description
     if data.lesson_date is not None:
         lesson.lesson_date = data.lesson_date
     if data.pages_from is not None:

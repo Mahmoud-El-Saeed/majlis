@@ -1,4 +1,4 @@
-import type { ShowResultMode, WindowStatus } from '../../api/types'
+import type { QuestionType, ShowResultMode, WindowStatus } from '../../api/types'
 
 // Student payload must never carry answer keys (server enforces; UI double-checks).
 export function hasAnswerLeak(payload: unknown): boolean {
@@ -17,11 +17,11 @@ export function isScoreVisible(mode: ShowResultMode, isPublished: boolean): bool
 export function windowLabel(status: WindowStatus): string {
   switch (status) {
     case 'open':
-      return 'مفتوح open'
+      return 'مفتوح'
     case 'upcoming':
-      return 'لم يبدأ بعد upcoming'
+      return 'لم يبدأ بعد'
     case 'closed':
-      return 'انتهى مغلق closed'
+      return 'انتهى'
   }
 }
 
@@ -32,4 +32,94 @@ export function windowStatusFromDates(openAt?: string | null, closeAt?: string |
   if (openAt && new Date(openAt).getTime() > now) return 'upcoming'
   if (closeAt && new Date(closeAt).getTime() < now) return 'closed'
   return 'open'
+}
+
+export type QuestionDraft = {
+  type: QuestionType
+  prompt: string
+  /** One input per option, Google-Forms-style (mcq only). */
+  options: string[]
+  correctIndex: string
+  tfAnswer: 'true' | 'false'
+  maxScore: string
+}
+
+export const MAX_MCQ_OPTIONS = 10
+export const MIN_MCQ_OPTIONS = 2
+
+export const blankDraft = (type: QuestionType = 'mcq'): QuestionDraft => ({
+  type,
+  prompt: '',
+  options: ['', ''],
+  correctIndex: '0',
+  tfAnswer: 'true',
+  maxScore: '5',
+})
+
+// Google-Forms-style authoring helpers (pure, unit-tested): the same rules
+// the backend enforces, mirrored for instant inline validation.
+export function normalizeOptions(input: string): string[] {
+  return input
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
+}
+
+function cleanOptions(options: string[]): string[] {
+  return options.map((s) => s.trim()).filter(Boolean)
+}
+
+export function validateDraft(d: QuestionDraft): string | null {
+  if (!d.prompt.trim()) return 'اكتب نص السؤال أولًا'
+  const max = Number(d.maxScore)
+  if (!Number.isFinite(max) || max <= 0) return 'الدرجة العظمى يجب أن تكون رقمًا موجبًا'
+  if (d.type === 'mcq') {
+    const opts = cleanOptions(d.options)
+    if (opts.length < MIN_MCQ_OPTIONS) return 'الاختيار من متعدد يحتاج اختيارين على الأقل'
+    const ci = Number(d.correctIndex)
+    if (!Number.isInteger(ci) || ci < 0 || ci >= opts.length)
+      return 'اختر الإجابة الصحيحة من الاختيارات'
+  }
+  return null
+}
+
+export function draftToBody(d: QuestionDraft, position: number): Record<string, unknown> {
+  const body: Record<string, unknown> = {
+    type: d.type,
+    prompt: d.prompt.trim(),
+    max_score: Number(d.maxScore),
+    position,
+  }
+  if (d.type === 'mcq') {
+    const opts = cleanOptions(d.options)
+    body['options'] = opts
+    body['correct_index'] = Math.min(Number(d.correctIndex), opts.length - 1)
+    body['clear_correct_answer'] = true
+  }
+  if (d.type === 'tf') {
+    body['correct_answer'] = d.tfAnswer === 'true'
+    body['clear_options'] = true
+    body['clear_correct_index'] = true
+  }
+  if (d.type === 'essay') {
+    body['clear_options'] = true
+    body['clear_correct_index'] = true
+    body['clear_correct_answer'] = true
+  }
+  return body
+}
+
+// Reorder helper: new position per id after a drag (caller PUTs the changed).
+export function positionsForOrder(ids: string[]): Array<{ id: string; position: number }> {
+  return ids.map((id, position) => ({ id, position }))
+}
+
+const pad2 = (n: number) => String(n).padStart(2, '0')
+
+// ISO → datetime-local input value (local timezone).
+export function toLocalInput(iso?: string | null): string {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`
 }

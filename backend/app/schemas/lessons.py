@@ -11,6 +11,7 @@ class LessonCreateIn(BaseModel):
     schemas validate shape only."""
 
     title: str = Field(min_length=1, max_length=200)
+    description: str | None = Field(default=None, max_length=2000)
     lesson_date: datetime | None = None
     pages_from: int | None = Field(default=None, ge=1)
     pages_to: int | None = Field(default=None, ge=1)
@@ -24,6 +25,7 @@ class LessonUpdateIn(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     title: str | None = Field(default=None, min_length=1, max_length=200)
+    description: str | None = Field(default=None, max_length=2000)
     lesson_date: datetime | None = None
     pages_from: int | None = Field(default=None, ge=1)
     pages_to: int | None = Field(default=None, ge=1)
@@ -39,6 +41,7 @@ class LessonOut(BaseModel):
     id: str
     course_id: str
     title: str
+    description: str | None = None
     lesson_date: datetime | None = None
     pages_from: int | None = None
     pages_to: int | None = None
@@ -62,6 +65,7 @@ class LessonSummaryOut(BaseModel):
     id: str
     course_id: str
     title: str
+    description: str | None = None
     lesson_date: datetime | None = None
     pages_from: int | None = None
     pages_to: int | None = None
@@ -76,6 +80,7 @@ def to_lesson_out(lesson, can_manage: bool = False) -> LessonOut:  # type: ignor
         id=str(lesson.id),
         course_id=str(lesson.course_id),
         title=lesson.title,
+        description=lesson.description,
         lesson_date=lesson.lesson_date,
         pages_from=lesson.pages_from,
         pages_to=lesson.pages_to,
@@ -94,6 +99,7 @@ def to_lesson_summary(lesson, attachment_count: int = 0) -> LessonSummaryOut:  #
         id=str(lesson.id),
         course_id=str(lesson.course_id),
         title=lesson.title,
+        description=lesson.description,
         lesson_date=lesson.lesson_date,
         pages_from=lesson.pages_from,
         pages_to=lesson.pages_to,

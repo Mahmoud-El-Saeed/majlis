@@ -31,6 +31,13 @@ def can_write(user: User, course: Course) -> bool:
     return course.created_by is not None and course.created_by == user.id
 
 
+def is_book_based(course: Course) -> bool:
+    """Ticket 16: kind is derived from the stored book name — the single
+    spelling of the check, so service guards cannot drift. Blank names
+    normalize to general (mirrors courseHasBook frontend)."""
+    return (course.book_title or "").strip() != ""
+
+
 async def create_course(db: AsyncSession, actor: User, data: CourseCreateIn) -> Course:
     owner_id: uuid.UUID | None = actor.id
     if actor.role == Role.admin and data.owner_id is not None:
@@ -41,7 +48,11 @@ async def create_course(db: AsyncSession, actor: User, data: CourseCreateIn) -> 
     course = Course(
         title=data.title.strip(),
         description=data.description,
-        book_title=data.book_title,
+        # Ticket 16: blank names normalize to general — the derived kind
+        # invariant (book course ⟺ stored name) cannot be broken by whitespace.
+        book_title=data.book_title.strip() or None
+        if data.book_title is not None
+        else None,
         organization_id=data.organization_id,
         created_by=owner_id,
     )
@@ -97,7 +108,16 @@ async def update_course(
     if data.description is not None:
         course.description = data.description
     if data.book_title is not None:
-        course.book_title = data.book_title
+        # Ticket 16: kind is fixed at creation and derived from whether a
+        # book name is stored. Absent (None) means "no change" — the schema
+        # cannot express an explicit clear, so the frontend never sends one.
+        name = data.book_title.strip()
+        if is_book_based(course) and not name:
+            raise CourseError("A book-based course keeps its book.")
+        if not is_book_based(course) and name:
+            raise CourseError("A general course cannot gain a book.")
+        if name:
+            course.book_title = name
     if data.organization_id is not None:
         course.organization_id = data.organization_id
     await db.flush()

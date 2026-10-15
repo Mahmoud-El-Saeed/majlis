@@ -45,13 +45,14 @@ class ExamUpdateIn(BaseModel):
 
 
 class QuestionCreateIn(BaseModel):
-    """Permissive shape; type-specific rules (4 options/1 correct, TF answer,
+    """Permissive shape; type-specific rules (2+ options/1 correct, TF answer,
     essay max_score) are enforced in the service for 400 responses."""
 
     type: QuestionTypeIn
     prompt: str = Field(min_length=1)
     options: list[str] | None = None
-    correct_index: int | None = Field(default=None, ge=0, le=3)
+    # Upper bound intentionally open: the service validates index < len(options).
+    correct_index: int | None = Field(default=None, ge=0)
     correct_answer: bool | None = None
     max_score: int | None = Field(default=None, gt=0)
     position: int = Field(default=0, ge=0)
@@ -64,7 +65,8 @@ class QuestionUpdateIn(BaseModel):
     prompt: str | None = Field(default=None, min_length=1)
     options: list[str] | None = None
     clear_options: bool = False
-    correct_index: int | None = Field(default=None, ge=0, le=3)
+    # Upper bound intentionally open: the service validates index < len(options).
+    correct_index: int | None = Field(default=None, ge=0)
     clear_correct_index: bool = False
     correct_answer: bool | None = None
     clear_correct_answer: bool = False

@@ -530,3 +530,77 @@ async def test_mode_flip_hides_then_publish_reveals(client: AsyncClient):
     pub = await client.post(f"/api/v1/attempts/{aid}/publish", headers=th)
     assert pub.status_code == 200, pub.text
     assert (await client.get(f"/api/v1/attempts/{aid}", headers=sh)).json()["score"] == 4
+
+
+async def test_writer_can_read_attempt_with_essay_text(client: AsyncClient):
+    """Ticket 16: course writers can open an attempt to read essay text for
+    grading (previously 403). Students keep owner-only visibility, and the
+    writer view never leaks correct answers."""
+    _, th, cid = await _teacher_with_course(client, "grt@x.com")
+    _, sh = await _student(client, "grs@x.com")
+    await create_user_in_db("gro@x.com", "password123", role=Role.teacher)
+    ot = await _tokens(client, "gro@x.com")
+    oh = {"Authorization": f"Bearer {ot['access_token']}"}
+    await _enroll_approved(client, th, cid, sh)
+    exam = await _make_exam(client, th, cid, show_result="after_publish")
+    mcq = await _add_mcq(client, th, exam["id"], correct=2, max_score=4)
+    essay = await _add_essay(client, th, exam["id"], max_score=10)
+    aid, _ = await _submit(
+        client,
+        sh,
+        exam["id"],
+        [
+            {"question_id": mcq["id"], "selected_index": 2},
+            {"question_id": essay["id"], "text_answer": "شرح مفصل"},
+        ],
+    )
+
+    view = await client.get(f"/api/v1/attempts/{aid}", headers=th)
+    assert view.status_code == 200, view.text
+    body = view.json()
+    texts = {a["question_id"]: a.get("text_answer") for a in body["answers"]}
+    assert texts[essay["id"]] == "شرح مفصل"
+    assert any(a.get("needs_grading") for a in body["answers"])
+    # No correct-answer leak even in the writer view.
+    assert "correct_index" not in view.text
+    assert "correct_answer" not in view.text
+
+    # Non-writer teacher and other students stay gated out.
+    assert (await client.get(f"/api/v1/attempts/{aid}", headers=oh)).status_code == 403
+    await create_user_in_db("grs2@x.com", "password123", role=Role.student)
+    s2 = await _tokens(client, "grs2@x.com")
+    s2h = {"Authorization": f"Bearer {s2['access_token']}"}
+    assert (await client.get(f"/api/v1/attempts/{aid}", headers=s2h)).status_code == 403
+
+
+async def test_writer_grades_after_read_and_student_sees_per_setting(client: AsyncClient):
+    """Ticket 16 review: the writer read path completes the loop — grade with
+    score + feedback, and the student sees it only per the publish setting."""
+    _, th, cid = await _teacher_with_course(client, "gw2t@x.com")
+    _, sh = await _student(client, "gw2s@x.com")
+    await _enroll_approved(client, th, cid, sh)
+    exam = await _make_exam(client, th, cid, show_result="after_publish")
+    essay = await _add_essay(client, th, exam["id"], max_score=10)
+    aid, _ = await _submit(
+        client, sh, exam["id"], [{"question_id": essay["id"], "text_answer": "شرح"}]
+    )
+
+    view = await client.get(f"/api/v1/attempts/{aid}", headers=th)
+    assert view.status_code == 200, view.text
+    assert any(a.get("text_answer") == "شرح" for a in view.json()["answers"])
+
+    g = await client.patch(
+        f"/api/v1/attempts/{aid}/answers/{essay['id']}",
+        json={"awarded_score": 8, "feedback": "جيد."},
+        headers=th,
+    )
+    assert g.status_code == 200, g.text
+
+    hidden = await client.get(f"/api/v1/attempts/{aid}", headers=sh)
+    assert hidden.status_code == 200, hidden.text
+    assert hidden.json()["score"] is None
+
+    p = await client.post(f"/api/v1/attempts/{aid}/publish", headers=th)
+    assert p.status_code == 200, p.text
+    shown = await client.get(f"/api/v1/attempts/{aid}", headers=sh)
+    assert shown.json()["score"] == 8

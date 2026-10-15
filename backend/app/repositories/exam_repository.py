@@ -17,7 +17,7 @@ class ExamRepository:
 
     async def list_for_course(self, db: AsyncSession, course_id: uuid.UUID) -> list[Exam]:
         result = await db.execute(
-            select(Exam).where(Exam.course_id == course_id).order_by(Exam.created_at.desc())
+            select(Exam).where(Exam.course_id == course_id).order_by(Exam.created_at.asc())
         )
         return list(result.scalars().all())
 

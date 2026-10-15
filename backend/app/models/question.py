@@ -42,8 +42,10 @@ class Question(Base):
     __table_args__ = (
         CheckConstraint("max_score > 0", name="ck_questions_max_score"),
         CheckConstraint("position >= 0", name="ck_questions_position"),
+        # MCQ options are 2+: index must sit inside the options array.
         CheckConstraint(
-            "correct_index IS NULL OR (correct_index >= 0 AND correct_index <= 3)",
+            "correct_index IS NULL OR (json_typeof(options) = 'array'"
+            " AND correct_index >= 0 AND correct_index < json_array_length(options))",
             name="ck_questions_correct_index",
         ),
     )

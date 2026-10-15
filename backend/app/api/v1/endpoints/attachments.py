@@ -13,8 +13,15 @@ from app.schemas.attachments import (
     to_attachment_out,
     to_student_attachment_out,
 )
+from app.schemas.course_attachments import (
+    CourseAttachmentCreateIn,
+    CourseAttachmentOut,
+    CourseAttachmentUpdateIn,
+    to_course_attachment_out,
+    to_student_course_attachment_out,
+)
 from app.schemas.lesson_media import ConfirmIn, UploadUrlIn
-from app.services import attachment_service
+from app.services import attachment_service, course_attachment_service
 from app.services.attachment_service import (
     AttachmentConflict,
     AttachmentError,
@@ -136,6 +143,126 @@ async def get_attachment_file(
     `?disposition=attachment` forces download."""
     try:
         out = await attachment_service.get_file_url(db, user, attachment_id, storage, disposition)
+    except (AttachmentError, CourseNotFound, CourseForbidden) as e:
+        raise HTTPException(status_code=_status(e), detail=e.message) from None
+    return AttachmentFileOut(**out)
+
+
+@router.post(
+    "/courses/{course_id}/attachments",
+    status_code=status.HTTP_201_CREATED,
+    response_model=CourseAttachmentOut,
+)
+async def create_course_attachment(
+    db: DbDep, user: CurrentUserDep, course_id: str, data: CourseAttachmentCreateIn
+) -> CourseAttachmentOut:
+    try:
+        row = await course_attachment_service.create_attachment(db, user, course_id, data)
+    except (AttachmentError, CourseNotFound, CourseForbidden) as e:
+        raise HTTPException(status_code=_status(e), detail=e.message) from None
+    return to_course_attachment_out(row)
+
+
+@router.get(
+    "/courses/{course_id}/attachments",
+    response_model=list[CourseAttachmentOut],
+)
+async def list_course_attachments(
+    db: DbDep, user: CurrentUserDep, course_id: str
+) -> list[CourseAttachmentOut]:
+    try:
+        rows, writer = await course_attachment_service.list_attachments(db, user, course_id)
+    except (AttachmentError, CourseNotFound, CourseForbidden) as e:
+        raise HTTPException(status_code=_status(e), detail=e.message) from None
+    to_out = to_course_attachment_out if writer else to_student_course_attachment_out
+    return [to_out(r) for r in rows]
+
+
+@router.put("/course-attachments/{attachment_id}", response_model=CourseAttachmentOut)
+async def update_course_attachment(
+    db: DbDep, user: CurrentUserDep, attachment_id: str, data: CourseAttachmentUpdateIn
+) -> CourseAttachmentOut:
+    try:
+        row = await course_attachment_service.update_attachment(db, user, attachment_id, data)
+    except (AttachmentError, CourseNotFound, CourseForbidden) as e:
+        raise HTTPException(status_code=_status(e), detail=e.message) from None
+    return to_course_attachment_out(row)
+
+
+@router.delete("/course-attachments/{attachment_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_course_attachment(
+    db: DbDep, user: CurrentUserDep, attachment_id: str
+) -> None:
+    try:
+        await course_attachment_service.delete_attachment(db, user, attachment_id)
+    except (AttachmentError, CourseNotFound, CourseForbidden) as e:
+        raise HTTPException(status_code=_status(e), detail=e.message) from None
+
+
+@router.post(
+    "/course-attachments/{attachment_id}/main", response_model=CourseAttachmentOut
+)
+async def designate_main_book(
+    db: DbDep, user: CurrentUserDep, attachment_id: str
+) -> CourseAttachmentOut:
+    """Designate the main book (book-based courses only). Replaces any
+    previous designation silently."""
+    try:
+        row = await course_attachment_service.designate_main_book(db, user, attachment_id)
+    except (AttachmentError, CourseNotFound, CourseForbidden) as e:
+        raise HTTPException(status_code=_status(e), detail=e.message) from None
+    return to_course_attachment_out(row)
+
+
+@router.post(
+    "/course-attachments/{attachment_id}/upload-url",
+    response_model=AttachmentUploadUrlOut,
+)
+async def get_course_attachment_upload_url(
+    db: DbDep,
+    user: CurrentUserDep,
+    storage: StorageDep,
+    attachment_id: str,
+    data: UploadUrlIn,
+) -> AttachmentUploadUrlOut:
+    try:
+        out = await course_attachment_service.request_upload_url(
+            db, user, attachment_id, data.content_type, data.file_ext, storage
+        )
+    except (AttachmentError, CourseNotFound, CourseForbidden) as e:
+        raise HTTPException(status_code=_status(e), detail=e.message) from None
+    return AttachmentUploadUrlOut(**out)
+
+
+@router.post("/course-attachments/{attachment_id}/confirm", response_model=CourseAttachmentOut)
+async def confirm_course_attachment_upload(
+    db: DbDep,
+    user: CurrentUserDep,
+    storage: StorageDep,
+    attachment_id: str,
+    data: ConfirmIn,
+) -> CourseAttachmentOut:
+    try:
+        row = await course_attachment_service.confirm_upload(
+            db, user, attachment_id, data.object_key, storage
+        )
+    except (AttachmentError, CourseNotFound, CourseForbidden) as e:
+        raise HTTPException(status_code=_status(e), detail=e.message) from None
+    return to_course_attachment_out(row)
+
+
+@router.get("/course-attachments/{attachment_id}/file", response_model=AttachmentFileOut)
+async def get_course_attachment_file(
+    db: DbDep,
+    user: CurrentUserDep,
+    storage: StorageDep,
+    attachment_id: str,
+    disposition: Annotated[FileDisposition, Query()] = "inline",
+) -> AttachmentFileOut:
+    try:
+        out = await course_attachment_service.get_file_url(
+            db, user, attachment_id, storage, disposition
+        )
     except (AttachmentError, CourseNotFound, CourseForbidden) as e:
         raise HTTPException(status_code=_status(e), detail=e.message) from None
     return AttachmentFileOut(**out)

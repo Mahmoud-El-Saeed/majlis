@@ -13,53 +13,8 @@ Contract under test:
 Storage I/O is faked at the seam boundary (no R2 network in tests).
 """
 
-import pytest
 
 from tests.helpers import create_user_in_db, login
-
-
-class FakeStorage:
-    """In-memory seam fake. Mirrors StorageClient protocol."""
-
-    def __init__(self) -> None:
-        self.objects: set[str] = set()
-        self._counter = 0
-
-    async def presign_put(self, key: str, content_type: str, expires_in: int) -> dict:
-        self._counter += 1
-        return {
-            "upload_url": f"https://fake-r2/{key}?sig=put-{self._counter}",
-            "object_key": key,
-            "expires_in": expires_in,
-        }
-
-    async def object_exists(self, key: str) -> bool:
-        return key in self.objects
-
-    async def presign_get(self, key: str, expires_in: int) -> dict:
-        return {
-            "playback_url": f"https://fake-r2/{key}?sig=get",
-            "expires_in": expires_in,
-        }
-
-
-@pytest.fixture
-def fake_storage(client) -> FakeStorage:
-    """Seam fake with per-test isolation: installed before the test, removed
-    after, so overrides and stored objects never leak across tests."""
-    from app.api import dependencies as deps
-
-    fake = FakeStorage()
-
-    async def override_storage():  # type: ignore[no-untyped-def]
-        yield fake
-
-    app = client._transport.app
-    app.dependency_overrides[deps.get_storage_client] = override_storage
-    try:
-        yield fake
-    finally:
-        app.dependency_overrides.pop(deps.get_storage_client, None)
 
 
 async def _tokens(client, email, password):

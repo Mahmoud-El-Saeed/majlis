@@ -114,6 +114,7 @@ export function AudioPlayer({
         }}
         className="audio-progress w-full"
         aria-label="التقدم"
+        aria-valuetext={`${fmt(progress)} من ${fmt(duration)}`}
       />
       <span dir="ltr" className="text-xs tabular-nums">
         {fmt(duration)}

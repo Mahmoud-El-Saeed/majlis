@@ -1,6 +1,7 @@
 from .attempt import Attempt, AttemptAnswer, AttemptStatus
 from .code_use import CodeUse
 from .course import Course
+from .course_attachment import CourseAttachment
 from .enrollment import Enrollment, EnrollmentStatus
 from .enrollment_code import EnrollmentCode
 from .exam import Exam, ShowResultMode
@@ -16,6 +17,7 @@ __all__ = [
     "AttemptStatus",
     "CodeUse",
     "Course",
+    "CourseAttachment",
     "Enrollment",
     "EnrollmentCode",
     "EnrollmentStatus",

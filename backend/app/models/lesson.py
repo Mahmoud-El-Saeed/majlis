@@ -35,6 +35,7 @@ class Lesson(Base):
         Uuid, ForeignKey("courses.id", ondelete="CASCADE"), index=True
     )
     title: Mapped[str] = mapped_column(String(200))
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
     lesson_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     pages_from: Mapped[int | None] = mapped_column(nullable=True)
     pages_to: Mapped[int | None] = mapped_column(nullable=True)

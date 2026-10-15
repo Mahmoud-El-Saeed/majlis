@@ -19,7 +19,7 @@ export function LessonBadge({ status }: { status: LessonStatus }) {
   const cls = status === 'ready' ? 'badge-primary' : status === 'failed' ? 'badge-secondary' : 'badge-primary'
   return (
     <span className={`${cls} transition-ui inline-flex items-center rounded-full px-3 py-1 text-xs font-bold`}>
-      {lessonAr[status]} {status}
+      {lessonAr[status]}
     </span>
   )
 }
@@ -36,7 +36,7 @@ export function WindowBadge({ status }: { status: WindowStatus }) {
       className="transition-ui inline-flex items-center rounded-full border px-3 py-1 text-xs font-bold"
       style={{ borderColor: 'var(--gold)' }}
     >
-      {windowAr[status]} {status}
+      {windowAr[status]}
     </span>
   )
 }

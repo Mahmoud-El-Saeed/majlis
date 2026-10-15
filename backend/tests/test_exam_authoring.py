@@ -2,7 +2,7 @@
 
 Contract under test (Seam 4, no students/enrollment needed):
 - Exam CRUD linked to course with optional lesson_id (null = general/book-wide).
-- Question bank: MCQ (4 options, 1 correct), TF, essay with max_score.
+- Question bank: MCQ (2+ options, 1 correct), TF, essay with max_score.
 - Config knobs persist + validate: attempts, duration, open/close, pass score,
   show-result immediate vs after_publish.
 - Writes: admin (any) or owner-teacher only; other teacher/student 403, anon 401.
@@ -171,7 +171,7 @@ async def test_exam_config_knobs_validated(client):
     ).status_code in (400, 422)
 
 
-async def test_mcq_requires_4_options_1_correct(client):
+async def test_mcq_requires_2plus_options_1_correct(client):
     from app.models.user import Role
 
     await create_user_in_db("exm@x.com", "password123", role=Role.teacher)
@@ -196,9 +196,24 @@ async def test_mcq_requires_4_options_1_correct(client):
     assert good.status_code == 201, good.text
     assert good.json()["correct_index"] == 2
 
+    # 2, 3, and 5+ options are all valid; index must sit inside the list.
+    for n, idx in ((2, 1), (3, 0), (5, 4)):
+        r = await client.post(
+            qurl,
+            json={
+                "type": "mcq",
+                "prompt": f"Q{n}",
+                "options": [f"o{i}" for i in range(n)],
+                "correct_index": idx,
+            },
+            headers=h,
+        )
+        assert r.status_code == 201, r.text
+        assert r.json()["correct_index"] == idx
+
     bad_options = await client.post(
         qurl,
-        json={"type": "mcq", "prompt": "Bad", "options": ["a", "b"], "correct_index": 0},
+        json={"type": "mcq", "prompt": "Bad", "options": ["only-one"], "correct_index": 0},
         headers=h,
     )
     assert bad_options.status_code in (400, 422), bad_options.text
@@ -381,3 +396,48 @@ async def test_exam_optional_knobs_can_be_cleared(client):
     assert body["open_at"] is None
     assert body["close_at"] is None
     assert body["lesson_id"] is None
+
+
+async def test_exam_list_returns_oldest_first_and_stays_ordered_after_delete(client):
+    """Ordering contract: exam list is created_at ascending (old->new display index)."""
+    import uuid
+    from datetime import UTC, datetime
+
+    from sqlalchemy import update
+
+    from app.models.exam import Exam
+    from app.models.user import Role
+    from tests.helpers import open_db_session
+
+    await create_user_in_db("ord_ex@x.com", "password123", role=Role.teacher)
+    t = await _tokens(client, "ord_ex@x.com", "password123")
+    h = {"Authorization": f"Bearer {t['access_token']}"}
+    course = await _course(client, t["access_token"], title="Ordered Exams")
+    ids: list[str] = []
+    for title in ("E1", "E2", "E3"):
+        r = await client.post(
+            f"/api/v1/courses/{course['id']}/exams", json={"title": title}, headers=h
+        )
+        assert r.status_code == 201, r.text
+        ids.append(r.json()["id"])
+    stamps = [
+        datetime(2024, 1, 1, tzinfo=UTC),
+        datetime(2024, 1, 2, tzinfo=UTC),
+        datetime(2024, 1, 3, tzinfo=UTC),
+    ]
+    async with open_db_session() as session:
+        for eid, ts in zip(ids, stamps, strict=True):
+            await session.execute(
+                update(Exam).where(Exam.id == uuid.UUID(eid)).values(created_at=ts)
+            )
+        await session.commit()
+
+    lst = await client.get(f"/api/v1/courses/{course['id']}/exams", headers=h)
+    assert lst.status_code == 200, lst.text
+    assert [exam["title"] for exam in lst.json()] == ["E1", "E2", "E3"]
+
+    mid = next(exam for exam in lst.json() if exam["title"] == "E2")
+    assert (await client.delete(f"/api/v1/exams/{mid['id']}", headers=h)).status_code == 204
+    lst2 = await client.get(f"/api/v1/courses/{course['id']}/exams", headers=h)
+    assert lst2.status_code == 200, lst2.text
+    assert [exam["title"] for exam in lst2.json()] == ["E1", "E3"]

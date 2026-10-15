@@ -30,6 +30,7 @@ export type LessonSummaryOut = {
   id: string
   course_id: string
   title: string
+  description?: string | null
   lesson_date?: string | null
   pages_from?: number | null
   pages_to?: number | null
@@ -47,6 +48,7 @@ export type LessonOut = LessonSummaryOut & {
 }
 
 export type PlayOut = { playback_url: string; expires_in: number }
+export type FileOut = { file_url: string; expires_in: number }
 export type UploadUrlOut = { upload_url: string; object_key: string; expires_in: number }
 
 export type CodeOut = {
@@ -58,7 +60,18 @@ export type CodeOut = {
   expires_at: string
   created_at: string
 }
-export type CodeListOut = Omit<CodeOut, 'code'>[]
+export type CodeListItem = {
+  id: string
+  code_prefix: string
+  max_uses: number
+  uses_count: number
+  expires_at: string
+  revoked_at?: string | null
+  created_by?: string | null
+  created_at: string
+}
+// Ticket 16 fix: the API returns a wrapped object, not a bare array.
+export type CodeListOut = { codes: CodeListItem[] }
 
 export type EnrollmentOut = {
   id: string
@@ -75,6 +88,8 @@ export type EnrollmentOut = {
   created_at: string
   updated_at: string
 }
+// Ticket 16 fix: the API returns a wrapped object, not a bare array.
+export type EnrollmentListOut = { enrollments: EnrollmentOut[] }
 
 export type DashboardItem = {
   course: CourseOut
@@ -114,6 +129,9 @@ export type QuestionOut = {
   type: QuestionType
   prompt: string
   options?: string[] | null
+  // Writer-only answer keys (exam detail/preview endpoints, never student paths).
+  correct_index?: number | null
+  correct_answer?: boolean | null
   max_score: number
   position: number
 }
@@ -157,13 +175,30 @@ export type AttemptOut = {
   answers: AttemptAnswerOut[]
 }
 
+export type GradebookAnswerOut = {
+  question_id: string
+  question_type: string
+  question_prompt: string
+  question_max: number
+  awarded_score: number
+  needs_grading: boolean
+  feedback?: string | null
+}
+
+// Ticket 16 fix: mirrors the backend per-attempt projection exactly.
 export type GradebookRowOut = {
+  attempt_id: string
+  exam_id: string
+  exam_title: string
   student_id: string
-  display_name: string
-  attempts: number
-  best_score?: number | null
-  last_score?: number | null
-  published: boolean
+  student_email: string
+  status: string
+  score?: number | null
+  max_score: number
+  is_published: boolean
+  is_late: boolean
+  submitted_at?: string | null
+  answers: GradebookAnswerOut[]
 }
 
 export type InviteOut = {
@@ -183,5 +218,18 @@ export type AttachmentOut = {
   file_key?: string | null
   content_type?: string | null
   has_file: boolean
+  created_at: string
+}
+
+export type CourseAttachmentOut = {
+  id: string
+  course_id: string
+  title: string
+  description?: string | null
+  file_key?: string | null
+  content_type?: string | null
+  size_bytes?: number | null
+  has_file: boolean
+  is_main_book: boolean
   created_at: string
 }

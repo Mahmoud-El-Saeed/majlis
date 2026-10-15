@@ -22,9 +22,9 @@ const badgeAr: Record<EnrollmentStatus, string> = {
   blocked: 'محظور',
 }
 
-// Enrollment badges always show Arabic + english key so backend enum stays visible.
+// Enrollment badges show Arabic only (Arabic-first UI).
 export function enrollmentBadge(status: EnrollmentStatus): string {
-  return `${badgeAr[status]} ${status}`
+  return badgeAr[status]
 }
 
 const dashboardAr: Record<DashboardEnrollmentStatus, string> = {
@@ -38,5 +38,5 @@ const dashboardAr: Record<DashboardEnrollmentStatus, string> = {
 
 // Dashboard course badges: same Arabic + key rule (owner/admin are membership states).
 export function dashboardBadge(status: DashboardEnrollmentStatus): string {
-  return `${dashboardAr[status]} ${status}`
+  return dashboardAr[status]
 }

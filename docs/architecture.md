@@ -34,7 +34,7 @@ backend/
 │   ├── api/v1/endpoints/
 │   │   ├── auth.py          # signup/verify/login/refresh/reset + me
 │   │   ├── users.py         # admin: teacher invites, bans
-│   │   ├── courses.py       # course=book CRUD
+│   │   ├── courses.py       # series CRUD (optional single book, kind fixed at creation)
 │   │   ├── lessons.py       # lesson CRUD + transcript textareas + audio refs
 │   │   ├── enrollment.py    # codes generate/trace/revoke + join + approve/reject/block
 │   │   ├── uploads.py       # presigned PUT issue + confirm/verify + playback URLs
@@ -78,17 +78,39 @@ erDiagram
     users ||--o{ attempts : sits
     users ||--o{ llm_api_keys : manages
     courses ||--o{ lessons : contains
+    courses ||--o{ course_attachments : has
+    lessons ||--o{ lesson_attachments : has
     courses ||--o{ enrollment_codes : issued_for
     courses ||--o{ exams : assessed_by
     courses ||--o{ enrollments : has
     lessons ||--o{ exams : scoped_to
+    courses {
+        uuid id PK
+        text title
+        text description_NULL
+        text book_title_NULL
+    }
+    course_attachments {
+        uuid id PK
+        uuid course_id FK
+        text title
+        text file_key_NULL
+        bool is_main_book
+    }
+    lesson_attachments {
+        uuid id PK
+        uuid lesson_id FK
+        text title
+        text file_key_NULL
+    }
     lessons {
         uuid id PK
         uuid course_id FK
         text title
+        text description_NULL
         date lesson_date
-        int pages_from
-        int pages_to
+        int pages_from_NULL
+        int pages_to_NULL
         text audio_ref
         text media_type
         text transcript_voice

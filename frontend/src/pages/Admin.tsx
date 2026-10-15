@@ -3,8 +3,11 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ApiError } from '../api/client'
 import { api } from '../api/http'
 import type { CourseOut, InviteOut, LessonOut } from '../api/types'
+import { courseHasBook } from '../features/courses/helpers'
 import { localizeDetail, str } from '../i18n'
 import { useToast } from '../components/Toast'
+import { Fab } from '../components/Fab'
+import { Modal } from '../components/Modal'
 import { btnPrimary, fieldCls, fieldStyle } from './Auth'
 
 type InviteList = { invites: InviteOut[] } | InviteOut[]
@@ -16,65 +19,25 @@ function normalizeInvites(data: InviteList | undefined): InviteOut[] {
 }
 
 export function AdminPage() {
-  const qc = useQueryClient()
-  const { toast } = useToast()
-  const [email, setEmail] = useState('')
-  const [rawNote, setRawNote] = useState<string | null>(null)
+  const [showInvite, setShowInvite] = useState(false)
+  const [showLesson, setShowLesson] = useState(false)
 
   const invites = useQuery({
     queryKey: ['invites'],
     queryFn: () => api.get<InviteList>('/invites'),
   })
 
-  const create = useMutation({
-    mutationFn: () => api.post<{ message: string }>('/invites', { email }),
-    onSuccess: () => {
-      setRawNote(`أُرسلت الدعوة إلى ${email} — الرابط في بريده (Mailpit محليًا)`)
-      setEmail('')
-      qc.invalidateQueries({ queryKey: ['invites'] })
-    },
-    onError: (e) => toast(e instanceof ApiError ? localizeDetail(e.detail) : 'تعذّر إنشاء الدعوة'),
-  })
-
   return (
     <main className="mx-auto w-full max-w-5xl px-4 pt-28 sm:px-6">
       <h1 className="font-heading text-3xl font-bold">{str.admin}</h1>
       <div className="card arabesque mt-4 rounded-2xl p-5">
-        <h2 className="font-heading mb-2 font-bold">دعوة معلم (بدون تسجيل عام)</h2>
-        <form
-          className="flex gap-2"
-          onSubmit={(e) => {
-            e.preventDefault()
-            create.mutate()
-          }}
-        >
-          <label className="flex-1">
-            <span className="mb-1 block text-sm">{str.email}</span>
-            <input
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              dir="ltr"
-              className={fieldCls}
-              style={fieldStyle}
-            />
-          </label>
-          <button type="submit" className="btn-primary transition-ui self-end rounded-xl px-5 py-2">
-            إرسال الدعوة
-          </button>
-        </form>
-        {rawNote && (
-          <p role="status" className="mt-2 text-sm">
-            {rawNote}
-          </p>
-        )}
+        <h2 className="font-heading mb-2 font-bold">دعوات المعلمين (بدون تسجيل عام)</h2>
         <ul className="mt-3 grid gap-2 text-sm">
           {normalizeInvites(invites.data).map((inv) => (
             <li key={inv.id} className="flex justify-between gap-2 rounded-xl border px-3 py-2" style={{ borderColor: 'var(--border)' }}>
               <span dir="ltr">{inv.email}</span>
               <span className="muted-t" dir="ltr">
-                {inv.used_at ? 'used' : inv.revoked_at ? 'revoked' : 'pending'}
+                {inv.used_at ? 'مستخدمة' : inv.revoked_at ? 'ملغاة' : 'بانتظار القبول'}
               </span>
             </li>
           ))}
@@ -85,23 +48,94 @@ export function AdminPage() {
         <h2 className="font-heading mb-1 font-bold">المستخدمون والحظر</h2>
         <p className="muted-t text-sm">
           لا توجد واجهة خلفية لإدارة المستخدمين/الحظر العام بعد (is_active موجود في القاعدة فقط) —
-          الحظر المتاح حاليًا per-course عبر قائمة الكتاب.
+          الحظر المتاح حاليًا per-course عبر قائمة السلسلة.
         </p>
       </div>
 
       <div className="card mt-4 rounded-2xl p-5">
-        <h2 className="font-heading mb-1 font-bold">ترحيل دروس Drive القديمة</h2>
+        <h2 className="font-heading mb-1 font-bold">الدروس</h2>
         <p className="muted-t mb-3 text-sm">
-          تسجيلات Drive القديمة تُرحّل يدويًا: أنشئ الدرس هنا (العنوان + التاريخ + الصفحات + لصق
-          النصوص) ثم ارفع الصوت من إدارة الكتاب.
+          أنشئ الدرس (العنوان + التاريخ + الوصف + لصق النصوص) ثم ارفع صوته من إدارة الدروس.
         </p>
-        <MigrationForm />
+        <button
+          type="button"
+          onClick={() => setShowLesson(true)}
+          className="btn-secondary transition-ui rounded-xl px-5 py-2"
+        >
+          إنشاء درس
+        </button>
       </div>
+
+      <Fab label="دعوة معلم" icon="mail" expanded onClick={() => setShowInvite(true)} />
+      {showInvite && (
+        <Modal title="دعوة معلم (بدون تسجيل عام)" onClose={() => setShowInvite(false)}>
+          <InviteForm onDone={() => setShowInvite(false)} />
+        </Modal>
+      )}
+      {showLesson && (
+        <Modal title="إنشاء درس" onClose={() => setShowLesson(false)}>
+          <p className="muted-t mb-3 text-sm">
+            أنشئ الدرس هنا (العنوان + التاريخ + الوصف + لصق النصوص) ثم ارفع صوته من إدارة الدروس.
+          </p>
+          <LessonCreateForm />
+        </Modal>
+      )}
     </main>
   )
 }
 
-function MigrationForm() {
+function InviteForm({ onDone }: { onDone: () => void }) {
+  const qc = useQueryClient()
+  const { toast } = useToast()
+  const [email, setEmail] = useState('')
+  const [rawNote, setRawNote] = useState<string | null>(null)
+
+  const create = useMutation({
+    mutationFn: () => api.post<{ message: string }>('/invites', { email }),
+    onSuccess: () => {
+      setRawNote(`أُرسلت الدعوة إلى ${email} — الرابط في بريده (Mailpit محليًا)`)
+      setEmail('')
+      qc.invalidateQueries({ queryKey: ['invites'] })
+      onDone()
+    },
+    onError: (e) => toast(e instanceof ApiError ? localizeDetail(e.detail) : 'تعذّر إنشاء الدعوة'),
+  })
+
+  return (
+    <>
+      <form
+        className="flex gap-2"
+        onSubmit={(e) => {
+          e.preventDefault()
+          create.mutate()
+        }}
+      >
+        <label className="flex-1">
+          <span className="mb-1 block text-sm">{str.email}</span>
+          <input
+            type="email"
+            required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            dir="ltr"
+            className={fieldCls}
+            style={fieldStyle}
+          />
+        </label>
+        <button type="submit" className="btn-primary transition-ui self-end rounded-xl px-5 py-2">
+          إرسال الدعوة
+        </button>
+      </form>
+      {rawNote && (
+        <p role="status" className="mt-2 text-sm">
+          {rawNote}
+        </p>
+      )}
+    </>
+  )
+}
+
+function LessonCreateForm() {
   const { toast } = useToast()
   const courses = useQuery({
     queryKey: ['courses-admin'],
@@ -109,11 +143,15 @@ function MigrationForm() {
   })
   const [courseId, setCourseId] = useState('')
   const [title, setTitle] = useState('')
+  const [description, setDescription] = useState('')
   const [lessonDate, setLessonDate] = useState('')
   const [pagesFrom, setPagesFrom] = useState('')
   const [pagesTo, setPagesTo] = useState('')
   const [voice, setVoice] = useState('')
   const [book, setBook] = useState('')
+  const selected = courses.data?.find((c) => c.id === courseId)
+  // Ticket 16: pages range exists only for book-based courses.
+  const hasBook = selected ? courseHasBook(selected) : false
 
   return (
     <form
@@ -121,21 +159,23 @@ function MigrationForm() {
       onSubmit={async (e) => {
         e.preventDefault()
         if (!courseId) {
-          toast('اختر الكتاب أولًا')
+          toast('اختر السلسلة أولًا')
           return
         }
         try {
           await api.post<LessonOut>(`/courses/${courseId}/lessons`, {
             title,
+            description: description.trim() || undefined,
             lesson_date: lessonDate || undefined,
-            pages_from: pagesFrom ? Number(pagesFrom) : undefined,
-            pages_to: pagesTo ? Number(pagesTo) : undefined,
+            pages_from: hasBook && pagesFrom ? Number(pagesFrom) : undefined,
+            pages_to: hasBook && pagesTo ? Number(pagesTo) : undefined,
             transcript_voice: voice || undefined,
             transcript_book: book || undefined,
             media_type: 'audio',
           })
-          toast('أُنشئ الدرس — ارفع صوته من إدارة الكتاب')
+          toast('أُنشئ الدرس — ارفع صوته من إدارة الدروس')
           setTitle('')
+          setDescription('')
           setVoice('')
           setBook('')
         } catch (ex) {
@@ -144,7 +184,7 @@ function MigrationForm() {
       }}
     >
       <label>
-        <span className="mb-1 block text-sm">الكتاب</span>
+        <span className="mb-1 block text-sm">السلسلة</span>
         <select value={courseId} onChange={(e) => setCourseId(e.target.value)} required className={fieldCls} style={fieldStyle}>
           <option value="">— اختر —</option>
           {courses.data?.map((c) => (
@@ -155,22 +195,30 @@ function MigrationForm() {
         </select>
       </label>
       <label>
-        <span className="mb-1 block text-sm">عنوان الدرس (من الأرشيف)</span>
+        <span className="mb-1 block text-sm">عنوان الدرس</span>
         <input value={title} onChange={(e) => setTitle(e.target.value)} required className={fieldCls} style={fieldStyle} />
+      </label>
+      <label>
+        <span className="mb-1 block text-sm">وصف (اختياري)</span>
+        <input value={description} onChange={(e) => setDescription(e.target.value)} className={fieldCls} style={fieldStyle} />
       </label>
       <div className="grid grid-cols-3 gap-2">
         <label>
           <span className="mb-1 block text-sm">التاريخ</span>
           <input type="date" value={lessonDate} onChange={(e) => setLessonDate(e.target.value)} dir="ltr" className={fieldCls} style={fieldStyle} />
         </label>
-        <label>
-          <span className="mb-1 block text-sm">من صفحة</span>
-          <input value={pagesFrom} onChange={(e) => setPagesFrom(e.target.value)} dir="ltr" inputMode="numeric" className={fieldCls} style={fieldStyle} />
-        </label>
-        <label>
-          <span className="mb-1 block text-sm">إلى صفحة</span>
-          <input value={pagesTo} onChange={(e) => setPagesTo(e.target.value)} dir="ltr" inputMode="numeric" className={fieldCls} style={fieldStyle} />
-        </label>
+        {hasBook && (
+          <>
+            <label>
+              <span className="mb-1 block text-sm">من صفحة (اختياري)</span>
+              <input value={pagesFrom} onChange={(e) => setPagesFrom(e.target.value)} dir="ltr" inputMode="numeric" className={fieldCls} style={fieldStyle} />
+            </label>
+            <label>
+              <span className="mb-1 block text-sm">إلى صفحة (اختياري)</span>
+              <input value={pagesTo} onChange={(e) => setPagesTo(e.target.value)} dir="ltr" inputMode="numeric" className={fieldCls} style={fieldStyle} />
+            </label>
+          </>
+        )}
       </div>
       <label>
         <span className="mb-1 block text-sm">نص ما قيل (لصق)</span>
@@ -181,7 +229,7 @@ function MigrationForm() {
         <textarea value={book} onChange={(e) => setBook(e.target.value)} rows={3} className={fieldCls} style={fieldStyle} />
       </label>
       <button type="submit" className={btnPrimary}>
-        إنشاء درس الأرشيف
+        إنشاء الدرس
       </button>
     </form>
   )

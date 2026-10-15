@@ -8,50 +8,7 @@ Contract:
   (playback via /play, files via attachment /file).
 """
 
-import pytest
-
 from tests.helpers import create_user_in_db, login
-
-
-class FakeStorage:
-    def __init__(self) -> None:
-        self.objects: set[str] = set()
-
-    async def presign_put(self, key: str, content_type: str, expires_in: int) -> dict:
-        return {
-            "upload_url": f"https://fake-r2/{key}?sig=put",
-            "object_key": key,
-            "expires_in": expires_in,
-        }
-
-    async def object_exists(self, key: str) -> bool:
-        return key in self.objects
-
-    async def presign_get(
-        self,
-        key: str,
-        expires_in: int,
-        filename: str | None = None,
-        disposition: str | None = None,
-    ) -> dict:
-        return {"playback_url": f"https://fake-r2/{key}?sig=get", "expires_in": expires_in}
-
-
-@pytest.fixture
-def fake_storage(client) -> FakeStorage:
-    from app.api import dependencies as deps
-
-    fake = FakeStorage()
-
-    async def override_storage():  # type: ignore[no-untyped-def]
-        yield fake
-
-    app = client._transport.app
-    app.dependency_overrides[deps.get_storage_client] = override_storage
-    try:
-        yield fake
-    finally:
-        app.dependency_overrides.pop(deps.get_storage_client, None)
 
 
 async def _tokens(client, email, password):

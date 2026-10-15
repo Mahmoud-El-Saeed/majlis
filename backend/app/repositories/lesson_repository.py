@@ -17,7 +17,7 @@ class LessonRepository:
 
     async def list_for_course(self, db: AsyncSession, course_id: uuid.UUID) -> list[Lesson]:
         result = await db.execute(
-            select(Lesson).where(Lesson.course_id == course_id).order_by(Lesson.created_at.desc())
+            select(Lesson).where(Lesson.course_id == course_id).order_by(Lesson.created_at.asc())
         )
         return list(result.scalars().all())
 

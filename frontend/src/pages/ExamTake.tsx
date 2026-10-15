@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { Link, useParams } from 'react-router-dom'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { ApiError } from '../api/client'
 import { api } from '../api/http'
 import type { AttemptOut, ExamDetailOut } from '../api/types'
 import { localizeDetail } from '../i18n'
+import { Modal } from '../components/Modal'
+import { WindowBadge } from '../components/Badges'
+import { windowStatusFromDates } from '../features/exams/helpers'
 
 type AnswerDraft = {
   selected_index?: number | null
@@ -21,9 +24,12 @@ function useCountdown(expiresAt: string | null | undefined) {
   if (!expiresAt) return null
   const ms = new Date(expiresAt).getTime() - now
   if (ms <= 0) return '00:00'
-  const m = Math.floor(ms / 60000)
+  const h = Math.floor(ms / 3600000)
+  const m = Math.floor((ms % 3600000) / 60000)
   const s = Math.floor((ms % 60000) / 1000)
-  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+  const mm = String(m).padStart(2, '0')
+  const ss = String(s).padStart(2, '0')
+  return h > 0 ? `${h}:${mm}:${ss}` : `${mm}:${ss}`
 }
 
 export function ExamTakePage() {
@@ -31,10 +37,17 @@ export function ExamTakePage() {
   const [attempt, setAttempt] = useState<AttemptOut | null>(null)
   const [drafts, setDrafts] = useState<Record<string, AnswerDraft>>({})
   const [err, setErr] = useState<string | null>(null)
+  const [confirming, setConfirming] = useState(false)
 
   const examMeta = useQuery({
     queryKey: ['exam-meta', id],
     queryFn: () => api.get<ExamDetailOut>(`/exams/${id}`).catch(() => null),
+    retry: false,
+  })
+  // Attempts used so far (for the pre-start summary) — own attempts only.
+  const mine = useQuery({
+    queryKey: ['my-attempts', id],
+    queryFn: () => api.get<AttemptOut[]>(`/exams/${id}/attempts/me`).catch(() => []),
     retry: false,
   })
 
@@ -74,6 +87,27 @@ export function ExamTakePage() {
           {err}
         </p>
       )}
+      {!attempt && examMeta.data && (
+        <div className="card mt-3 rounded-2xl p-4 text-sm">
+          <p className="muted-t">{examMeta.data.description || 'اقرأ التفاصيل قبل البدء — يبدأ العداد فور الضغط.'}</p>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <WindowBadge status={windowStatusFromDates(examMeta.data.open_at, examMeta.data.close_at)} />
+            <span className="muted-t">
+              المدة: <span dir="ltr">{examMeta.data.duration_minutes ?? '—'}</span> دقيقة
+            </span>
+            <span className="muted-t">
+              الأسئلة: <span dir="ltr">{examMeta.data.questions.length}</span>
+            </span>
+            <span className="muted-t">
+              محاولاتك: <span dir="ltr">{mine.data?.length ?? 0}</span> /{' '}
+              <span dir="ltr">{examMeta.data.attempts_limit}</span>
+            </span>
+          </div>
+          <Link to={`/exams/${id}/mine`} className="mt-2 inline-block text-sm underline">
+            محاولاتي
+          </Link>
+        </div>
+      )}
       {!attempt && (
         <button
           type="button"
@@ -88,8 +122,7 @@ export function ExamTakePage() {
         <>
           {timer && (
             <div
-              className="mt-3 flex items-center gap-2 rounded-xl px-4 py-2 text-sm"
-              style={{ backgroundColor: 'var(--sand)' }}
+              className="card mt-3 flex items-center gap-2 rounded-xl px-4 py-2 text-sm"
               role="timer"
               aria-label="الوقت المتبقي"
             >
@@ -174,14 +207,43 @@ export function ExamTakePage() {
             ))}
           </ol>
           {!submitted ? (
-            <button
-              type="button"
-              onClick={() => submit.mutate()}
-              disabled={submit.isPending}
-              className="btn-primary transition-ui mt-4 rounded-xl px-6 py-2 font-bold"
-            >
-              تسليم
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={() => setConfirming(true)}
+                disabled={submit.isPending}
+                className="btn-primary transition-ui mt-4 rounded-xl px-6 py-2 font-bold"
+              >
+                تسليم
+              </button>
+              {confirming && (
+                <Modal title="تأكيد التسليم" onClose={() => setConfirming(false)}>
+                  <p className="muted-t text-sm">
+                    لن تتمكن من التعديل بعد التسليم — راجع إجاباتك أولًا.
+                  </p>
+                  <div className="mt-4 flex gap-2">
+                    <button
+                      type="button"
+                      disabled={submit.isPending}
+                      onClick={() => {
+                        setConfirming(false)
+                        submit.mutate()
+                      }}
+                      className="btn-primary transition-ui rounded-xl px-6 py-2 font-bold"
+                    >
+                      تأكيد التسليم
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setConfirming(false)}
+                      className="btn-secondary transition-ui rounded-xl px-5 py-2"
+                    >
+                      مراجعة
+                    </button>
+                  </div>
+                </Modal>
+              )}
+            </>
           ) : (
             <div className="card mt-4 rounded-2xl p-4" role="status">
               {attempt.score !== null && attempt.score !== undefined && attempt.is_published ? (
@@ -192,6 +254,22 @@ export function ExamTakePage() {
               ) : (
                 <p>تم التسليم — {attempt.is_published ? 'بانتظار تصحيح المقالية' : 'النتائج تُنشر لاحقًا من المعلم'}</p>
               )}
+              <div className="mt-3 flex flex-wrap gap-2 text-sm">
+                <Link
+                  to={`/courses/${attempt.course_id}`}
+                  className="transition-ui clickable rounded-xl border px-4 py-1.5"
+                  style={{ borderColor: 'var(--border)' }}
+                >
+                  عودة إلى السلسلة
+                </Link>
+                <Link
+                  to={`/exams/${id}/mine`}
+                  className="transition-ui clickable rounded-xl border px-4 py-1.5"
+                  style={{ borderColor: 'var(--border)' }}
+                >
+                  محاولاتي
+                </Link>
+              </div>
             </div>
           )}
         </>

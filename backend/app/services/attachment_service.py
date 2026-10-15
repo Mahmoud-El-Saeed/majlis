@@ -15,11 +15,12 @@ from app.schemas.attachments import (
     FileDisposition,
 )
 from app.services.course_service import CourseNotFound, can_view, can_write
-
-
-class AttachmentError(Exception):
-    def __init__(self, message: str):
-        self.message = message
+from app.services.file_gates import (
+    LESSON_FILE_TYPES,
+    AttachmentError,
+    check_file,
+    check_size,
+)
 
 
 class AttachmentNotFound(AttachmentError):
@@ -34,19 +35,10 @@ class AttachmentConflict(AttachmentError):
     pass
 
 
-def _check_pdf(content_type: str | None, file_ext: str | None) -> tuple[str, str]:
-    """PDF-only gate for handouts. Returns (content_type, ext)."""
-    pdf_content_type = (content_type or "").strip().lower()
-    ext = (file_ext or ".pdf").strip().lower()
-    if not ext.startswith("."):
-        ext = f".{ext}"
-    if pdf_content_type != "application/pdf" or ext != ".pdf":
-        raise AttachmentError("Only PDF attachments are supported.")
-    return pdf_content_type, ext
-
-
-def build_attachment_key(course_id: str, lesson_id: str, attachment_id: str) -> str:
-    return f"courses/{course_id}/lessons/{lesson_id}/attachments/{attachment_id}.pdf"
+def build_lesson_attachment_key(
+    course_id: str, lesson_id: str, attachment_id: str, ext: str
+) -> str:
+    return f"courses/{course_id}/lessons/{lesson_id}/attachments/{attachment_id}{ext}"
 
 
 async def _load_lesson(
@@ -147,11 +139,11 @@ async def request_upload_url(
     file_ext: str | None,
     storage: StorageClient,
 ) -> dict:
-    pdf_content_type, _ext = _check_pdf(content_type, file_ext)
+    file_content_type, ext = check_file(LESSON_FILE_TYPES, content_type, file_ext)
     row, lesson, course = await _load_attachment(db, actor, attachment_id, need_write=True)
-    key = build_attachment_key(str(course.id), str(lesson.id), str(row.id))
+    key = build_lesson_attachment_key(str(course.id), str(lesson.id), str(row.id), ext)
     settings = get_settings()
-    return await storage.presign_put(key, pdf_content_type, settings.S3_UPLOAD_EXPIRE_SEC)
+    return await storage.presign_put(key, file_content_type, settings.S3_UPLOAD_EXPIRE_SEC)
 
 
 async def confirm_upload(
@@ -165,12 +157,16 @@ async def confirm_upload(
     expected_prefix = f"courses/{course.id}/lessons/{lesson.id}/attachments/{row.id}"
     if not object_key.startswith(expected_prefix):
         raise AttachmentConflict("Upload not found. Retry with a fresh upload URL.")
-    if not object_key.lower().endswith(".pdf"):
-        raise AttachmentError("Only PDF attachments are supported.")
+    key_ext = object_key[object_key.rfind(".") :].lower()
+    if not any(key_ext in exts for exts in LESSON_FILE_TYPES.values()):
+        raise AttachmentError("Only PDF, PNG, JPEG, and WEBP attachments are supported.")
     if not await storage.object_exists(object_key):
         raise AttachmentConflict("Upload not found. Retry with a fresh upload URL.")
+    check_size(await storage.object_size(object_key))
     row.file_key = object_key
-    row.content_type = "application/pdf"
+    row.content_type = next(
+        ct for ct, exts in LESSON_FILE_TYPES.items() if key_ext in exts
+    )
     await db.flush()
     await db.refresh(row)
     return row
@@ -187,8 +183,9 @@ async def get_file_url(
     if not row.file_key:
         raise AttachmentConflict("Attachment file is not ready yet.")
     settings = get_settings()
-    filename = f"{row.title}.pdf"
+    key_ext = row.file_key[row.file_key.rfind(".") :] if "." in row.file_key else ""
+    filename = f"{row.title}{key_ext}"
     out = await storage.presign_get(
-        row.file_key, settings.S3_PLAY_EXPIRE_SEC, filename, disposition
+        row.file_key, settings.S3_PLAY_EXPIRE_SEC, filename, disposition, row.content_type
     )
     return {"file_url": out["playback_url"], "expires_in": out["expires_in"]}

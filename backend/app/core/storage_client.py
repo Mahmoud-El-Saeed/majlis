@@ -22,12 +22,16 @@ class StorageClient(Protocol):
 
     async def object_exists(self, key: str) -> bool: ...
 
+    async def object_size(self, key: str) -> int | None:
+        """HeadObject ContentLength for confirm-time size caps. None = missing."""
+
     async def presign_get(
         self,
         key: str,
         expires_in: int,
         filename: str | None = None,
         disposition: str | None = None,
+        content_type: str | None = None,
     ) -> dict: ...
 
 
@@ -62,12 +66,25 @@ class Aioboto3StorageClient:
                 return False
             raise
 
+    async def object_size(self, key: str) -> int | None:
+        from botocore.exceptions import ClientError
+
+        try:
+            out = await self._s3.head_object(Bucket=self._bucket, Key=key)  # type: ignore[misc]
+        except ClientError as e:
+            if e.response.get("Error", {}).get("Code") in ("404", "NoSuchKey", "NotFound"):
+                return None
+            raise
+        length = out.get("ContentLength")
+        return int(length) if length is not None else None
+
     async def presign_get(
         self,
         key: str,
         expires_in: int,
         filename: str | None = None,
         disposition: str | None = None,
+        content_type: str | None = None,
     ) -> dict:
         s3 = self._s3
         params: dict = {"Bucket": self._bucket, "Key": key}
@@ -76,7 +93,9 @@ class Aioboto3StorageClient:
         if disposition in ("inline", "attachment"):
             safe = (filename or key.rsplit("/", 1)[-1]).replace('"', "")
             params["ResponseContentDisposition"] = f'{disposition}; filename="{safe}"'
-            if key.lower().endswith(".pdf"):
+            if content_type:
+                params["ResponseContentType"] = content_type
+            elif key.lower().endswith(".pdf"):
                 params["ResponseContentType"] = "application/pdf"
         url = await s3.generate_presigned_url(  # type: ignore[misc]
             ClientMethod="get_object",

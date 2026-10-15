@@ -1,17 +1,17 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { DashboardPage } from '../Dashboard'
 
 // Integration: enrollment flow entry — empty dashboard shows Arabic empty
-// state + always-available Join-with-code box (spec: one account joins N courses).
+// state + join action behind a FAB (spec: one account joins N courses).
 describe('dashboard enrollment entry', () => {
   beforeEach(() => {
     vi.unstubAllGlobals()
   })
 
-  it('empty dashboard shows empty state and join box', async () => {
+  it('empty dashboard shows empty state and join FAB opening a modal', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(async (url: string) => {
@@ -30,9 +30,12 @@ describe('dashboard enrollment entry', () => {
       </QueryClientProvider>,
     )
     await waitFor(() => {
-      expect(screen.getByAltText('لا كتب بعد')).toBeInTheDocument()
+      expect(screen.getByAltText('لا سلاسل بعد')).toBeInTheDocument()
     })
-    expect(screen.getByText('انضم برمز الكتاب')).toBeInTheDocument()
+    // Join form is hidden until the FAB opens it.
+    expect(screen.queryByLabelText('الرمز')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'انضم برمز السلسلة' }))
+    expect(await screen.findByRole('dialog', { name: 'انضم برمز السلسلة' })).toBeInTheDocument()
     expect(screen.getByLabelText('الرمز')).toHaveAttribute('dir', 'ltr')
   })
 })

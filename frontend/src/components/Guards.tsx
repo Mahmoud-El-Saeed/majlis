@@ -1,6 +1,7 @@
-import { Navigate, useLocation } from 'react-router-dom'
+import { Link, Navigate, useLocation } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../api/http'
+import { Skeleton } from './Skeleton'
 import type { EnrollmentOut } from '../api/types'
 import { canViewContent } from '../features/enrollment/gates'
 import { enrollmentBadge } from '../features/enrollment/gates'
@@ -12,15 +13,16 @@ import { useAuth } from '../features/auth/AuthContext'
 export function RequireAuth({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth()
   const loc = useLocation()
-  if (loading) return <p className="pt-28 text-center">…</p>
+  if (loading) return <Skeleton label="جار التحقق" className="mx-auto mt-28 h-16 max-w-md rounded-2xl" />
   if (!user) return <Navigate to="/login" state={{ from: loc.pathname }} replace />
   return <>{children}</>
 }
 
 export function RequireTeacher({ children }: { children: React.ReactNode }) {
   const { user, loading, isTeacher } = useAuth()
-  if (loading) return <p className="pt-28 text-center">…</p>
-  if (!user) return <Navigate to="/login" replace />
+  const loc = useLocation()
+  if (loading) return <Skeleton label="جار التحقق" className="mx-auto mt-28 h-16 max-w-md rounded-2xl" />
+  if (!user) return <Navigate to="/login" state={{ from: loc.pathname }} replace />
   if (!isTeacher) return <Navigate to="/dashboard" replace />
   return <>{children}</>
 }
@@ -38,26 +40,32 @@ export function RequireApproved({
   children: React.ReactNode
 }) {
   const { user, loading } = useAuth()
+  const loc = useLocation()
   const enrollment = useQuery({
     queryKey: ['my-enrollment', courseId],
     queryFn: () => api.get<EnrollmentOut | null>(`/courses/${courseId}/my-enrollment`),
     retry: false,
   })
-  if (loading || enrollment.isPending) return <p className="pt-28 text-center">…</p>
-  if (!user) return <Navigate to="/login" replace />
+  if (loading || enrollment.isPending) return <Skeleton label="جار التحقق" className="mx-auto mt-28 h-16 max-w-md rounded-2xl" />
+  if (!user) return <Navigate to="/login" state={{ from: loc.pathname }} replace />
   const status = enrollment.data === null ? null : (enrollment.data?.status ?? null)
   if (!canViewContent(status ?? undefined)) {
     return (
       <main className="mx-auto max-w-md px-4 pt-28 text-center">
-        <p className="card rounded-2xl p-5">
+        <div className="card rounded-2xl p-5">
           {status ? (
-            <>
+            <p>
               {enrollmentBadge(status)} — المحتوى للأعضاء المقبولين فقط
-            </>
+            </p>
           ) : (
-            'لم تنضم بعد — استخدم صندوق الانضمام في لوحتك.'
+            <>
+              <p>لم تنضم بعد — استخدم صندوق الانضمام في لوحتك.</p>
+              <Link to="/dashboard" className="btn-primary transition-ui mt-3 inline-block rounded-xl px-4 py-1.5">
+                إلى لوحتك للانضمام
+              </Link>
+            </>
           )}
-        </p>
+        </div>
       </main>
     )
   }
@@ -66,8 +74,9 @@ export function RequireApproved({
 
 export function RequireAdmin({ children }: { children: React.ReactNode }) {
   const { user, loading, isAdmin } = useAuth()
-  if (loading) return <p className="pt-28 text-center">…</p>
-  if (!user) return <Navigate to="/login" replace />
+  const loc = useLocation()
+  if (loading) return <Skeleton label="جار التحقق" className="mx-auto mt-28 h-16 max-w-md rounded-2xl" />
+  if (!user) return <Navigate to="/login" state={{ from: loc.pathname }} replace />
   if (!isAdmin) return <Navigate to="/dashboard" replace />
   return <>{children}</>
 }

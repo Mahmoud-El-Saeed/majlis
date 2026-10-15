@@ -283,19 +283,31 @@ def show_grades_for(exam: Exam, attempt: Attempt) -> bool:
 
 async def get_attempt(
     db: AsyncSession, actor: User, attempt_id: str
-) -> tuple[Attempt, Exam, list[Question], list[AttemptAnswer]]:
+) -> tuple[Attempt, Exam, list[Question], list[AttemptAnswer], bool]:
+    """Attempt read for review and grading. Owners read their own attempts;
+    course writers (owner-teacher/admin) read any attempt of their course so
+    essays can be graded (ticket 16) — through the same student-safe question
+    shape, so this stays consistent with ADR-0007 (no answer keys leak).
+    Everyone else stays gated out. Returns (attempt, exam, questions,
+    answers, is_writer)."""
+    from app.services.course_service import can_write
+
     attempt = await attempt_repository.get_by_id(db, attempt_id)
     if attempt is None:
         raise AttemptNotFound("Attempt not found.")
-    _require_owner(attempt, actor)
     exam = await exam_repository.get_by_id(db, str(attempt.exam_id))
     if exam is None:
         raise AttemptNotFound("Exam not found.")
     course = await _course_for_exam(db, exam)
-    await _require_student_taker(db, actor, course)
+    is_writer = can_write(actor, course)
+    if attempt.student_id != actor.id:
+        if not is_writer:
+            raise AttemptForbidden("Not authorized.")
+    else:
+        await _require_student_taker(db, actor, course)
     questions = await question_repository.list_for_exam(db, exam.id)
     answers = await attempt_answer_repository.list_for_attempt(db, attempt.id)
-    return attempt, exam, questions, answers
+    return attempt, exam, questions, answers, is_writer
 
 
 async def list_my_attempts(

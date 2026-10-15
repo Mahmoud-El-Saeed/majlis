@@ -6,9 +6,14 @@ import { api } from '../api/http'
 import type { DashboardOut } from '../api/types'
 import { canViewContent } from '../features/enrollment/gates'
 import { dashboardBadge } from '../features/enrollment/gates'
+import { matchesArabic } from '../features/courses/helpers'
 import { localizeDetail, str } from '../i18n'
 import { useToast } from '../components/Toast'
+import { Fab } from '../components/Fab'
+import { Modal } from '../components/Modal'
 import { EnrollmentBadge } from '../components/Badges'
+import { NumberBadge } from '../components/NumberBadge'
+import { SearchBox } from '../components/SearchBox'
 import { StarDivider } from '../components/Star8'
 import emptyCourses from '../assets/empty-courses.svg'
 import { btnPrimary, fieldCls, fieldStyle } from './Auth'
@@ -36,14 +41,12 @@ export function JoinBox({ onJoined }: { onJoined: () => void }) {
   })
 
   return (
-    <div className="card arch-sm arch-frame p-5">
-      <h2 className="font-heading mb-2 text-lg font-bold">{str.joinWithCode}</h2>
-      <form
-        onSubmit={(e) => {
-          e.preventDefault()
-          join.mutate({ code: code.trim(), display_name: displayName.trim() })
-        }}
-      >
+    <form
+      onSubmit={(e) => {
+        e.preventDefault()
+        join.mutate({ code: code.trim(), display_name: displayName.trim() })
+      }}
+    >
         <label className="mb-2 block">
           <span className="mb-1 block text-sm">الرمز</span>
           <input
@@ -75,36 +78,71 @@ export function JoinBox({ onJoined }: { onJoined: () => void }) {
           {str.join}
         </button>
       </form>
-    </div>
   )
 }
 
 export function DashboardPage() {
   const qc = useQueryClient()
+  const [showJoin, setShowJoin] = useState(false)
   const dash = useQuery({
     queryKey: ['dashboard'],
     queryFn: () => api.get<DashboardOut>('/dashboard'),
   })
+  const [query, setQuery] = useState('')
+  // Numbering = index+1 in the FULL ordered list; filter keeps full-list numbers.
+  const numberedItems = (dash.data?.items ?? []).map((it, i) => ({ item: it, n: i + 1 }))
+  const visibleItems = numberedItems.filter(({ item: it }) =>
+    matchesArabic(`${it.course.title} ${it.course.book_title ?? ''}`, query),
+  )
 
   return (
     <main className="mx-auto w-full max-w-6xl px-4 pt-28 sm:px-6 lg:px-8">
       <h1 className="font-heading mb-1 text-3xl font-bold">{str.myCourses}</h1>
       <StarDivider />
-      <div className="mt-4 grid gap-4 md:grid-cols-[1fr_320px]">
+      {dash.data && dash.data.items.length > 0 && (
+        <div className="mt-4">
+          <SearchBox value={query} onChange={setQuery} />
+        </div>
+      )}
+      {query && dash.data && dash.data.items.length > 0 && (
+        <p className="muted-t mt-1 text-xs">
+          {str.resultCount}: <span dir="ltr">{visibleItems.length}</span>
+        </p>
+      )}
+      <div className="mt-4">
         <section aria-label="الكتب">
           {dash.isPending && <div className="skeleton h-32 rounded-2xl" aria-label="جار التحميل" />}
-          {dash.isError && <p role="alert">تعذّر التحميل</p>}
+          {dash.isError && (
+            <div className="card rounded-2xl p-5 text-center">
+              <p role="alert">تعذّر التحميل</p>
+              <button
+                type="button"
+                onClick={() => dash.refetch()}
+                className="btn-secondary transition-ui mt-2 rounded-xl px-4 py-1.5"
+              >
+                {str.retry}
+              </button>
+            </div>
+          )}
           {dash.data && dash.data.items.length === 0 && (
             <div className="card rounded-2xl p-6 text-center">
-              <img src={emptyCourses} alt="لا كتب بعد" className="mx-auto mb-3" width={240} />
-              <p className="muted-t">لا كتب بعد — انضم برمز من الشيخ</p>
+              <img src={emptyCourses} alt="لا سلاسل بعد" className="mx-auto mb-3" width={240} />
+              <p className="muted-t">لا سلاسل بعد — انضم برمز من الشيخ</p>
+            </div>
+          )}
+          {dash.data && dash.data.items.length > 0 && visibleItems.length === 0 && (
+            <div className="card rounded-2xl p-6 text-center">
+              <p className="muted-t">{str.noResults}</p>
             </div>
           )}
           <ul className="grid gap-4 sm:grid-cols-2">
-            {dash.data?.items.map((it) => (
+            {visibleItems.map(({ item: it, n }) => (
               <li key={it.course.id} className="card arabesque rounded-2xl p-5">
-                <h2 className="font-heading text-xl font-bold">{it.course.title}</h2>
-                {it.course.book_title && <p className="muted-t text-sm">{it.course.book_title}</p>}
+                <div className="flex items-center gap-2">
+                  <NumberBadge n={n} />
+                  <h2 dir="auto" className="font-heading text-xl font-bold">{it.course.title}</h2>
+                </div>
+                {it.course.book_title && <p dir="auto" className="muted-t text-sm">{it.course.book_title}</p>}
                 <p className="muted-t mt-1 text-xs">
                   {it.ready_count} / {it.lesson_count} دروس جاهزة
                 </p>
@@ -125,7 +163,7 @@ export function DashboardPage() {
                     to={`/courses/${it.course.id}`}
                     className="btn-primary transition-ui mt-3 inline-block rounded-xl px-4 py-1.5"
                   >
-                    دخول الكتاب
+                    دخول السلسلة
                   </Link>
                 ) : (
                   <p className="muted-t mt-3 text-sm">أدخلت رمزًا؟ انتظر مراجعة الشيخ.</p>
@@ -134,10 +172,18 @@ export function DashboardPage() {
             ))}
           </ul>
         </section>
-        <aside>
-          <JoinBox onJoined={() => qc.invalidateQueries({ queryKey: ['dashboard'] })} />
-        </aside>
       </div>
+      <Fab label={str.joinWithCode} icon="key" expanded onClick={() => setShowJoin(true)} />
+      {showJoin && (
+        <Modal title={str.joinWithCode} onClose={() => setShowJoin(false)}>
+          <JoinBox
+            onJoined={() => {
+              qc.invalidateQueries({ queryKey: ['dashboard'] })
+              setShowJoin(false)
+            }}
+          />
+        </Modal>
+      )}
     </main>
   )
 }

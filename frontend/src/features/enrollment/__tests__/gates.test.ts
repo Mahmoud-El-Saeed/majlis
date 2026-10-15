@@ -26,11 +26,15 @@ describe('enrollment gates', () => {
     expect(canRejoin('pending')).toBe(false)
   })
 
-  it('badge always shows Arabic + english key', () => {
+  it('badge shows Arabic only', () => {
+    const ar: Record<string, string> = {
+      pending: 'بانتظار',
+      approved: 'مقبول',
+      rejected: 'مرفوض',
+      blocked: 'محظور',
+    }
     for (const s of ['pending', 'approved', 'rejected', 'blocked'] as const) {
-      const b = enrollmentBadge(s)
-      expect(b).toMatch(/pending|approved|rejected|blocked/)
-      expect(b.length).toBeGreaterThan(s.length)
+      expect(enrollmentBadge(s)).toBe(ar[s])
     }
   })
 })

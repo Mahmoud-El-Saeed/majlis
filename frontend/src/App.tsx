@@ -8,8 +8,9 @@ import { CoursePage, LessonPage } from './pages/Course'
 import { ExamTakePage, MyAttemptsPage } from './pages/ExamTake'
 import { TeachDashboard } from './pages/Teach'
 import { CourseManagePage } from './pages/CourseManage'
+import { LessonManagePage } from './pages/LessonManage'
 import { CodesQueuePage } from './pages/CodesQueue'
-import { CourseExamsPage, ExamDetailManagePage, GradebookPage } from './pages/ExamAuthor'
+import { CourseExamsPage, EssayGradingPage, ExamDetailManagePage, GradebookPage } from './pages/ExamAuthor'
 import { AdminPage, ChatStubPage, VaultStubPage } from './pages/Admin'
 
 export default function App() {
@@ -33,10 +34,12 @@ export default function App() {
 
         <Route path="/teach" element={<RequireWriter><TeachDashboard /></RequireWriter>} />
         <Route path="/teach/courses/:id" element={<RequireWriter><CourseManagePage /></RequireWriter>} />
+        <Route path="/teach/courses/:id/lessons/:lessonId" element={<RequireWriter><LessonManagePage /></RequireWriter>} />
         <Route path="/teach/courses/:id/codes" element={<RequireWriter><CodesQueuePage /></RequireWriter>} />
         <Route path="/teach/courses/:id/exams" element={<RequireWriter><CourseExamsPage /></RequireWriter>} />
         <Route path="/teach/exams/:examId" element={<RequireWriter><ExamDetailManagePage /></RequireWriter>} />
         <Route path="/teach/exams/:examId/grade" element={<RequireWriter><GradebookPage /></RequireWriter>} />
+        <Route path="/teach/exams/:examId/essays" element={<RequireWriter><EssayGradingPage /></RequireWriter>} />
 
         <Route path="/admin" element={<RequireAdmin><AdminPage /></RequireAdmin>} />
         <Route path="/admin/vault" element={<RequireAdmin><VaultStubPage /></RequireAdmin>} />

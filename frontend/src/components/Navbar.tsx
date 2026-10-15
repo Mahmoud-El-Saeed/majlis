@@ -1,4 +1,5 @@
-import { Link, useNavigate } from 'react-router-dom'
+import { useState } from 'react'
+import { Link, NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../features/auth/AuthContext'
 import { str } from '../i18n'
 import { ThemeToggle } from './ThemeToggle'
@@ -7,6 +8,27 @@ import logoStar from '../assets/logo-star.svg'
 export function Navbar() {
   const { user, logout, isTeacher, isAdmin } = useAuth()
   const nav = useNavigate()
+  const [menuOpen, setMenuOpen] = useState(false)
+
+  const linkCls = ({ isActive }: { isActive: boolean }) =>
+    `transition-ui clickable rounded-lg px-2 py-1 hover:opacity-80 ${isActive ? 'font-bold' : ''}`
+
+  // Collapse secondary links into a menu on small screens so the fixed
+  // header stays one row and never overlaps page content (pt-28 offset).
+  const secondaryLinks = (
+    <>
+      {(isTeacher || isAdmin) && (
+        <NavLink to="/teach" className={linkCls} style={({ isActive }) => (isActive ? { borderBottom: '2px solid var(--gold)' } : undefined)}>
+          {str.teacher}
+        </NavLink>
+      )}
+      {isAdmin && (
+        <NavLink to="/admin" className={linkCls} style={({ isActive }) => (isActive ? { borderBottom: '2px solid var(--gold)' } : undefined)}>
+          {str.admin}
+        </NavLink>
+      )}
+    </>
+  )
 
   return (
     <header
@@ -26,23 +48,18 @@ export function Navbar() {
         <nav className="flex items-center gap-2 text-sm" aria-label="التنقل">
           {user ? (
             <>
-              <Link to="/dashboard" className="transition-ui clickable rounded-lg px-2 py-1 hover:opacity-80">
+              <NavLink
+                to="/dashboard"
+                className={linkCls}
+                style={({ isActive }) => (isActive ? { borderBottom: '2px solid var(--gold)' } : undefined)}
+              >
                 {str.myCourses}
-              </Link>
-              {(isTeacher || isAdmin) && (
-                <Link to="/teach" className="transition-ui clickable rounded-lg px-2 py-1 hover:opacity-80">
-                  {str.teacher}
-                </Link>
-              )}
-              {isAdmin && (
-                <Link to="/admin" className="transition-ui clickable rounded-lg px-2 py-1 hover:opacity-80">
-                  {str.admin}
-                </Link>
-              )}
+              </NavLink>
+              <span className="hidden sm:contents">{secondaryLinks}</span>
               <span className="muted-t hidden sm:inline">{user.email}</span>
               <button
                 type="button"
-                className="transition-ui clickable rounded-lg border px-3 py-1"
+                className="transition-ui clickable hidden rounded-lg border px-3 py-1 sm:block"
                 style={{ borderColor: 'var(--border)' }}
                 onClick={() => {
                   logout()
@@ -51,6 +68,18 @@ export function Navbar() {
               >
                 {str.logout}
               </button>
+              <span className="sm:hidden">
+                <button
+                  type="button"
+                  onClick={() => setMenuOpen((o) => !o)}
+                  aria-expanded={menuOpen}
+                  aria-label="القائمة"
+                  className="transition-ui clickable rounded-lg border px-3 py-1"
+                  style={{ borderColor: 'var(--border)' }}
+                >
+                  ☰
+                </button>
+              </span>
             </>
           ) : (
             <>
@@ -69,6 +98,25 @@ export function Navbar() {
           <ThemeToggle />
         </nav>
       </div>
+      {user && menuOpen && (
+        <div className="mx-auto mt-2 flex max-w-6xl flex-col gap-1 border-t pt-2 text-sm sm:hidden" style={{ borderColor: 'var(--border)' }}>
+          <span onClick={() => setMenuOpen(false)} className="contents">
+            {secondaryLinks}
+          </span>
+          <button
+            type="button"
+            className="transition-ui clickable rounded-lg border px-3 py-1 text-start"
+            style={{ borderColor: 'var(--border)' }}
+            onClick={() => {
+              setMenuOpen(false)
+              logout()
+              nav('/login')
+            }}
+          >
+            {str.logout}
+          </button>
+        </div>
+      )}
     </header>
   )
 }

@@ -2,6 +2,9 @@ import { useEffect, useState } from 'react'
 import { str } from '../i18n'
 
 export function ThemeToggle() {
+  // The pre-paint script in index.html already applied the stored/OS theme
+  // to <html>, so the toggle just mirrors the DOM and persists on change —
+  // no load effect (the old load-vs-save race reset the theme on refresh).
   const [dark, setDark] = useState(() => document.documentElement.classList.contains('dark'))
 
   useEffect(() => {
@@ -12,16 +15,6 @@ export function ThemeToggle() {
       /* ignore */
     }
   }, [dark])
-
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem('mj_theme')
-      if (saved === 'dark') setDark(true)
-      else if (saved === 'light') setDark(false)
-    } catch {
-      /* ignore */
-    }
-  }, [])
 
   return (
     <button

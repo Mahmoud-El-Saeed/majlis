@@ -9,59 +9,8 @@ Contract:
 - Unready file -> 409; pending student -> 403; non-PDF -> 400.
 """
 
-import pytest
 
 from tests.helpers import create_user_in_db, login
-
-
-class FakeStorage:
-    def __init__(self) -> None:
-        self.objects: set[str] = set()
-        self._counter = 0
-        self.last_get: dict | None = None
-
-    async def presign_put(self, key: str, content_type: str, expires_in: int) -> dict:
-        self._counter += 1
-        return {
-            "upload_url": f"https://fake-r2/{key}?sig=put-{self._counter}",
-            "object_key": key,
-            "expires_in": expires_in,
-        }
-
-    async def object_exists(self, key: str) -> bool:
-        return key in self.objects
-
-    async def presign_get(
-        self,
-        key: str,
-        expires_in: int,
-        filename: str | None = None,
-        disposition: str | None = None,
-    ) -> dict:
-        self.last_get = {"filename": filename, "disposition": disposition}
-        disp = disposition or "inline"
-        safe = (filename or key.rsplit("/", 1)[-1]).replace('"', "")
-        return {
-            "playback_url": f"https://fake-r2/{key}?sig=get&disp={disp}&file={safe}",
-            "expires_in": expires_in,
-        }
-
-
-@pytest.fixture
-def fake_storage(client) -> FakeStorage:
-    from app.api import dependencies as deps
-
-    fake = FakeStorage()
-
-    async def override_storage():  # type: ignore[no-untyped-def]
-        yield fake
-
-    app = client._transport.app
-    app.dependency_overrides[deps.get_storage_client] = override_storage
-    try:
-        yield fake
-    finally:
-        app.dependency_overrides.pop(deps.get_storage_client, None)
 
 
 async def _tokens(client, email, password):
@@ -396,3 +345,108 @@ async def test_student_list_hides_unready_and_file_keys(client, fake_storage):
     assert rows[0]["title"] == "Ready"
     assert rows[0]["has_file"] is True
     assert rows[0]["file_key"] is None
+
+
+async def test_lesson_attachment_accepts_images(client, fake_storage):
+    """Ticket 16: lesson handouts accept PDF or images (png/jpeg/webp)."""
+    fake = fake_storage
+    t, course, lesson = await _setup_teacher_lesson(client)
+    th = {"Authorization": f"Bearer {t['access_token']}"}
+    created = await client.post(
+        f"/api/v1/courses/{course['id']}/lessons/{lesson['id']}/attachments",
+        json={"title": "Board photo"},
+        headers=th,
+    )
+    aid = created.json()["id"]
+
+    up = await client.post(
+        f"/api/v1/lesson-attachments/{aid}/upload-url",
+        json={"content_type": "image/png", "file_ext": ".png"},
+        headers=th,
+    )
+    assert up.status_code == 200, up.text
+    key = up.json()["object_key"]
+    assert key.endswith(".png")
+
+    fake.put_object(key, size=1024)
+    r = await client.post(
+        f"/api/v1/lesson-attachments/{aid}/confirm",
+        json={"object_key": key},
+        headers=th,
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["content_type"] == "image/png"
+
+    # Mismatched type/ext still rejected.
+    up2 = await client.post(
+        f"/api/v1/lesson-attachments/{aid}/upload-url",
+        json={"content_type": "image/png", "file_ext": ".pdf"},
+        headers=th,
+    )
+    assert up2.status_code == 400, up2.text
+
+
+async def test_confirm_rejects_oversize_file(client, fake_storage, monkeypatch):
+    """Ticket 16: 100MB/file cap enforced at confirm via stored size."""
+    fake = fake_storage
+    monkeypatch.setenv("ATTACHMENT_MAX_FILE_BYTES", "100")
+    t, course, lesson = await _setup_teacher_lesson(client)
+    th = {"Authorization": f"Bearer {t['access_token']}"}
+    created = await client.post(
+        f"/api/v1/courses/{course['id']}/lessons/{lesson['id']}/attachments",
+        json={"title": "Big"},
+        headers=th,
+    )
+    aid = created.json()["id"]
+    up = await client.post(
+        f"/api/v1/lesson-attachments/{aid}/upload-url",
+        json={"content_type": "application/pdf", "file_ext": ".pdf"},
+        headers=th,
+    )
+    key = up.json()["object_key"]
+    fake.put_object(key, size=101)
+    r = await client.post(
+        f"/api/v1/lesson-attachments/{aid}/confirm",
+        json={"object_key": key},
+        headers=th,
+    )
+    assert r.status_code == 400, r.text
+    assert "compress" in r.text.lower()
+
+
+async def test_lesson_confirm_rejects_oversize_and_wrong_ext(client, fake_storage, monkeypatch):
+    """Ticket 16 review: size/format rejections covered for lessons too."""
+    fake = fake_storage
+    monkeypatch.setenv("ATTACHMENT_MAX_FILE_BYTES", "100")
+    t, course, lesson = await _setup_teacher_lesson(client)
+    th = {"Authorization": f"Bearer {t['access_token']}"}
+    created = await client.post(
+        f"/api/v1/courses/{course['id']}/lessons/{lesson['id']}/attachments",
+        json={"title": "Big image"},
+        headers=th,
+    )
+    aid = created.json()["id"]
+    up = await client.post(
+        f"/api/v1/lesson-attachments/{aid}/upload-url",
+        json={"content_type": "image/jpeg", "file_ext": ".jpg"},
+        headers=th,
+    )
+    assert up.status_code == 200, up.text
+    key = up.json()["object_key"]
+
+    fake.put_object(key, size=101)
+    r = await client.post(
+        f"/api/v1/lesson-attachments/{aid}/confirm",
+        json={"object_key": key},
+        headers=th,
+    )
+    assert r.status_code == 400, r.text
+
+    fake.put_object(key, size=10)
+    r = await client.post(
+        f"/api/v1/lesson-attachments/{aid}/confirm",
+        json={"object_key": key},
+        headers=th,
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["content_type"] == "image/jpeg"

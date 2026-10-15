@@ -1,3 +1,9 @@
+> **Superseded.** This was the pre-revision draft and is preserved as history only.
+> The living spec is `.scratch/majlis-v1/spec.md` (seams re-confirmed after
+> revision review). In particular this draft still describes a compress/worker
+> pipeline, transcript txt files, and Google Drive — all rejected or removed;
+> see ADR-0005 (superseded) and ADR-0008.
+
 ## Problem Statement
 
 As a student in a mosque study circle learning Islamic sciences with a sheikh, I lose track of what was explained when I miss a session or want to review. Today recordings, book page photos/PDFs live in a shared Google Drive folder with no structure, no permissions control, no exams/grades, and no way to ask questions against what the sheikh actually said.

@@ -12,7 +12,9 @@ class AttemptAnswerIn(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     question_id: UUID
-    selected_index: int | None = Field(default=None, ge=0, le=3)
+    # Upper bound intentionally open (MCQ options are 2+): an out-of-range
+    # selection simply scores incorrect in the service.
+    selected_index: int | None = Field(default=None, ge=0)
     selected_bool: bool | None = None
     text_answer: str | None = None
 

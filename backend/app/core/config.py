@@ -33,6 +33,9 @@ class Settings(BaseSettings):
     S3_BUCKET: str = "majlis-media"
     S3_UPLOAD_EXPIRE_SEC: int = 900
     S3_PLAY_EXPIRE_SEC: int = 3600
+    # Ticket 16: per-file cap for attachments (lesson audio stays uncapped;
+    # R2 budget is its cap). Enforced at confirm via HeadObject size.
+    ATTACHMENT_MAX_FILE_BYTES: int = 100 * 1024 * 1024
     ADMIN_EMAIL: str | None = None
     ADMIN_PASSWORD: str | None = None
 

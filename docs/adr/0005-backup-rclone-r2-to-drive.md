@@ -1,6 +1,8 @@
 # ADR-0005: Backup — scheduled rclone sync R2 → Google Drive
 
-Status: deferred (post-V1)
+Status: superseded (ticket 16 — Google Drive removed from the project entirely; R2 is the sole copy of media bytes with no backup story).
+
+> Historical record preserved as-is below. Drive is no longer referenced anywhere in the product, spec, or UI.
 
 ## Context
 

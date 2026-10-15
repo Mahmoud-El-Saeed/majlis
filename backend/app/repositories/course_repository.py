@@ -16,7 +16,7 @@ class CourseRepository:
         return result.scalars().first()
 
     async def list_all(self, db: AsyncSession) -> list[Course]:
-        result = await db.execute(select(Course).order_by(Course.created_at.desc()))
+        result = await db.execute(select(Course).order_by(Course.created_at.asc()))
         return list(result.scalars().all())
 
     async def list_by_ids(self, db: AsyncSession, course_ids: list[uuid.UUID]) -> list[Course]:

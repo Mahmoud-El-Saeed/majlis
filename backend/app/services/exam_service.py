@@ -221,14 +221,14 @@ def _check_question_shapes(
     if qtype == QuestionType.mcq.value:
         if (
             options is None
-            or len(options) != 4
+            or len(options) < 2
             or any(not isinstance(o, str) or not o.strip() for o in options)
         ):
-            raise ExamError("MCQ questions need exactly 4 non-empty options.")
+            raise ExamError("MCQ questions need at least 2 non-empty options.")
         if correct_index is None:
-            raise ExamError("MCQ questions need correct_index (0-3).")
-        if correct_index < 0 or correct_index > 3:
-            raise ExamError("MCQ correct_index must be 0-3.")
+            raise ExamError("MCQ questions need correct_index.")
+        if correct_index < 0 or correct_index >= len(options):
+            raise ExamError("MCQ correct_index out of range.")
         if correct_answer is not None:
             raise ExamError("MCQ questions must not set correct_answer.")
         return (options, correct_index, None, _default_score(max_score))

@@ -1,8 +1,10 @@
+import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../api/http'
 import type {
   AttachmentOut,
+  CourseAttachmentOut,
   CourseOut,
   EnrollmentOut,
   LessonOut,
@@ -11,10 +13,14 @@ import type {
   StudentExamOut,
 } from '../api/types'
 import { canViewContent } from '../features/enrollment/gates'
+import { courseHasBook, matchesArabic, openAttachmentFile } from '../features/courses/helpers'
 import { hasAnswerLeak, isScoreVisible } from '../features/exams/helpers'
 import { str } from '../i18n'
 import { AudioPlayer } from '../components/AudioPlayer'
 import { LessonBadge, WindowBadge } from '../components/Badges'
+import { NumberBadge } from '../components/NumberBadge'
+import { SearchBox } from '../components/SearchBox'
+import { Skeleton } from '../components/Skeleton'
 import { StarDivider } from '../components/Star8'
 import emptyLessons from '../assets/empty-lessons.svg'
 import lessonCover from '../assets/lesson-cover.svg'
@@ -40,17 +46,50 @@ export function CoursePage() {
 
   const status = myEnrollment.data === null ? null : (myEnrollment.data?.status ?? null)
   const canView = myEnrollment.data === null ? false : canViewContent(status ?? undefined)
+  // Ticket 16: no pages line anywhere for general courses (legacy stored
+  // pages stay hidden too).
+  const showPages = course.data ? courseHasBook(course.data) : false
+
+  // Numbering = index+1 in the FULL ordered list (backend oldest→newest);
+  // search filters client-side but rows keep their full-list number.
+  const [lessonQuery, setLessonQuery] = useState('')
+  const [examQuery, setExamQuery] = useState('')
+  const numberedLessons = (lessons.data ?? []).map((l, i) => ({ lesson: l, n: i + 1 }))
+  const visibleLessons = numberedLessons.filter(({ lesson: l }) =>
+    matchesArabic(`${l.title} ${l.description ?? ''}`, lessonQuery),
+  )
+  const numberedExams = (studentExams.data ?? []).map((ex, i) => ({ exam: ex, n: i + 1 }))
+  // Answer-leaked rows are never rendered; drop them here so the visible
+  // list and the result count agree (numbers still come from the full list).
+  const visibleExams = numberedExams.filter(
+    ({ exam: ex }) => !hasAnswerLeak(ex) && matchesArabic(ex.title, examQuery),
+  )
 
   return (
     <main className="mx-auto w-full max-w-6xl px-4 pt-28 sm:px-6 lg:px-8">
       {course.data && <h1 className="font-heading text-3xl font-bold">{course.data.title}</h1>}
       <StarDivider />
       {myEnrollment.data === null && (
-        <p className="card mt-4 rounded-2xl p-4">لم تنضم بعد — استخدم صندوق الانضمام في لوحتك.</p>
+        <div className="card mt-4 rounded-2xl p-4">
+          <p>لم تنضم بعد — استخدم صندوق الانضمام في لوحتك.</p>
+          <Link to="/dashboard" className="btn-primary transition-ui mt-3 inline-block rounded-xl px-4 py-1.5">
+            إلى لوحتك للانضمام
+          </Link>
+        </div>
       )}
       <div className="mt-4 grid gap-6 md:grid-cols-2">
         <section aria-label="الدروس">
           <h2 className="font-heading mb-2 text-xl font-bold">{str.lessons}</h2>
+          {(lessons.data?.length ?? 0) > 0 && (
+            <div className="mb-2">
+              <SearchBox value={lessonQuery} onChange={setLessonQuery} />
+            </div>
+          )}
+          {lessonQuery && (lessons.data?.length ?? 0) > 0 && (
+            <p className="muted-t mb-2 text-xs">
+              {str.resultCount}: <span dir="ltr">{visibleLessons.length}</span>
+            </p>
+          )}
           {lessons.isPending && <div className="skeleton h-24 rounded-2xl" />}
           {lessons.data?.length === 0 && (
             <div className="card rounded-2xl p-5 text-center">
@@ -58,17 +97,26 @@ export function CoursePage() {
               <p className="muted-t">لا دروس منشورة بعد</p>
             </div>
           )}
+          {lessons.data && lessons.data.length > 0 && visibleLessons.length === 0 && (
+            <p className="muted-t mt-2 text-center text-sm">{str.noResults}</p>
+          )}
           <ul className="grid gap-4">
-            {lessons.data?.map((l) => (
+            {visibleLessons.map(({ lesson: l, n }) => (
               <li key={l.id} className="card arch arch-frame overflow-hidden">
                 <div className="arch-img m-3 mb-0">
                   <img src={lessonCover} alt={`غلاف ${l.title}`} className="h-32 w-full object-cover" />
                 </div>
                 <div className="p-4">
-                  <h3 className="font-heading font-bold">{l.title}</h3>
-                  <p className="muted-t text-xs" dir="ltr">
-                    {l.pages_from ?? '?'} – {l.pages_to ?? '?'}
-                  </p>
+                  <div className="flex items-center gap-2">
+                    <NumberBadge n={n} />
+                    <h3 dir="auto" className="font-heading font-bold">{l.title}</h3>
+                  </div>
+                  {l.description && <p dir="auto" className="muted-t mt-1 text-sm">{l.description}</p>}
+                  {showPages && (l.pages_from != null || l.pages_to != null) && (
+                    <p className="muted-t text-xs" dir="ltr">
+                      {l.pages_from ?? '?'} – {l.pages_to ?? '?'}
+                    </p>
+                  )}
                   <div className="mt-1">
                     <LessonBadge status={l.status} />
                   </div>
@@ -91,16 +139,31 @@ export function CoursePage() {
         </section>
         <section aria-label="الاختبارات">
           <h2 className="font-heading mb-2 text-xl font-bold">{str.exams}</h2>
+          {(studentExams.data?.length ?? 0) > 0 && (
+            <div className="mb-2">
+              <SearchBox value={examQuery} onChange={setExamQuery} />
+            </div>
+          )}
+          {examQuery && (studentExams.data?.length ?? 0) > 0 && (
+            <p className="muted-t mb-2 text-xs">
+              {str.resultCount}: <span dir="ltr">{visibleExams.length}</span>
+            </p>
+          )}
           {studentExams.isError && (
             <p className="muted-t text-sm">الاختبارات للأعضاء المقبولين فقط</p>
           )}
+          {studentExams.data && studentExams.data.length > 0 && visibleExams.length === 0 && (
+            <p className="muted-t mt-2 text-center text-sm">{str.noResults}</p>
+          )}
           <ul className="grid gap-3">
-            {studentExams.data?.map((ex) => {
-              if (hasAnswerLeak(ex)) return null
+            {visibleExams.map(({ exam: ex, n }) => {
               return (
                 <li key={ex.id} className="card rounded-2xl p-4">
                   <div className="flex items-center justify-between gap-2">
-                    <h3 className="font-heading font-bold">{ex.title}</h3>
+                    <div className="flex items-center gap-2">
+                      <NumberBadge n={n} />
+                      <h3 dir="auto" className="font-heading font-bold">{ex.title}</h3>
+                    </div>
                     <WindowBadge status={ex.window_status} />
                   </div>
                   <p className="muted-t text-xs">
@@ -124,7 +187,42 @@ export function CoursePage() {
           </ul>
         </section>
       </div>
+      {canView && <CourseFiles courseId={id} />}
     </main>
+  )
+}
+
+function CourseFiles({ courseId }: { courseId: string }) {
+  const list = useQuery({
+    queryKey: ['course-attachments', courseId],
+    queryFn: () => api.get<CourseAttachmentOut[]>(`/courses/${courseId}/attachments`),
+    retry: false,
+  })
+  if (list.isPending || list.isError || !list.data?.length) return null
+  return (
+    <section aria-label="ملفات السلسلة" className="mt-6">
+      <h2 className="font-heading mb-2 text-xl font-bold">ملفات السلسلة</h2>
+      <ul className="grid gap-2">
+        {list.data.filter((a) => a.has_file).map((a) => (
+          <li key={a.id} className="card flex flex-wrap items-center justify-between gap-2 rounded-2xl p-4">
+            <div>
+              <p className="font-bold">
+                {a.title}{' '}
+                {a.is_main_book && (
+                  <span className="rounded-full border px-2 py-0.5 text-xs" style={{ borderColor: 'var(--gold)' }}>
+                    الكتاب الأساسي
+                  </span>
+                )}
+              </p>
+              {a.description && <p className="muted-t text-sm">{a.description}</p>}
+            </div>
+            <button type="button" onClick={() => openAttachmentFile('course', a.id)} className="btn-secondary transition-ui rounded-xl px-4 py-1.5">
+              فتح
+            </button>
+          </li>
+        ))}
+      </ul>
+    </section>
   )
 }
 
@@ -139,8 +237,11 @@ function Attachments({ courseId, lessonId }: { courseId: string; lessonId: strin
   return (
     <ul className="mt-3 grid gap-2">
       {list.data.filter((a) => a.has_file).map((a) => (
-        <li key={a.id} className="card rounded-xl p-3 text-sm">
-          {a.title}
+        <li key={a.id} className="card flex items-center justify-between gap-2 rounded-xl p-3 text-sm">
+          <span>{a.title}</span>
+          <button type="button" onClick={() => openAttachmentFile('lesson', a.id)} className="underline">
+            فتح
+          </button>
         </li>
       ))}
     </ul>
@@ -153,15 +254,31 @@ export function LessonPage() {
     queryKey: ['lesson', id],
     queryFn: () => api.get<LessonOut>(`/lessons/${id}`),
   })
+  const course = useQuery({
+    queryKey: ['lesson-course', lesson.data?.course_id],
+    queryFn: () => api.get<CourseOut>(`/courses/${lesson.data?.course_id}`),
+    enabled: Boolean(lesson.data?.course_id),
+  })
+  // Ticket 16: no pages line anywhere for general courses.
+  const showPages = course.data ? courseHasBook(course.data) : false
 
   return (
     <main className="mx-auto w-full max-w-3xl px-4 pt-28 sm:px-6">
+      {lesson.isPending && <Skeleton label="جار تحميل الدرس" className="h-40 rounded-2xl" />}
       {lesson.data && (
         <>
-          <h1 className="font-heading text-2xl font-bold">{lesson.data.title}</h1>
-          <p className="muted-t text-sm" dir="ltr">
-            صفحات {lesson.data.pages_from ?? '?'} – {lesson.data.pages_to ?? '?'}
-          </p>
+          {lesson.data.course_id && (
+            <Link to={`/courses/${lesson.data.course_id}`} className="text-sm underline">
+              → عودة إلى السلسلة
+            </Link>
+          )}
+          <h1 className="font-heading mt-1 text-2xl font-bold">{lesson.data.title}</h1>
+          {lesson.data.description && <p className="muted-t mt-1 text-sm">{lesson.data.description}</p>}
+          {showPages && (lesson.data.pages_from != null || lesson.data.pages_to != null) && (
+            <p className="muted-t text-sm" dir="ltr">
+              صفحات {lesson.data.pages_from ?? '?'} – {lesson.data.pages_to ?? '?'}
+            </p>
+          )}
           <div className="mt-1">
             <LessonBadge status={lesson.data.status} />
           </div>

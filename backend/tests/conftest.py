@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from app.core.database import Base, get_db
 from app.core.rate_limit import reset_memory_limits
 from app.main import create_app
+from tests.fakes import FakeStorage
 
 # Standing decision: tests run against Postgres (same version as prod),
 # never SQLite — SQLite hides ENUM/Uuid/TZ/JSONB-class bugs.
@@ -91,3 +92,23 @@ async def client(monkeypatch: pytest.MonkeyPatch) -> AsyncGenerator[AsyncClient]
         yield ac
     await _flush_rate_limits()
     await engine.dispose()
+
+
+@pytest_asyncio.fixture
+async def fake_storage(client) -> AsyncGenerator[FakeStorage]:
+    """Shared in-memory StorageClient seam fake with per-test isolation:
+    installed before the test, removed after, so overrides and stored
+    objects never leak across tests."""
+    from app.api import dependencies as deps
+
+    fake = FakeStorage()
+
+    async def override_storage():  # type: ignore[no-untyped-def]
+        yield fake
+
+    app = client._transport.app  # type: ignore[union-attr]
+    app.dependency_overrides[deps.get_storage_client] = override_storage
+    try:
+        yield fake
+    finally:
+        app.dependency_overrides.pop(deps.get_storage_client, None)

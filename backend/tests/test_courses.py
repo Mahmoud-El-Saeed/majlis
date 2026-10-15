@@ -206,3 +206,95 @@ async def test_course_not_found(client):
         headers={"Authorization": f"Bearer {t['access_token']}"},
     )
     assert r.status_code == 404, r.text
+
+
+async def test_book_kind_fixed_at_creation(client):
+    """Ticket 16: kind is fixed at creation. A book-based course can never
+    lose its book name; a general course can never gain one. Renames are fine."""
+    from app.models.user import Role
+
+    await create_user_in_db("kf@x.com", "password123", role=Role.teacher)
+    t = await _tokens(client, "kf@x.com", "password123")
+    h = {"Authorization": f"Bearer {t['access_token']}"}
+
+    book = await client.post(
+        "/api/v1/courses", json={"title": "Series", "book_title": "Book A"}, headers=h
+    )
+    assert book.status_code == 201, book.text
+    general = await client.post("/api/v1/courses", json={"title": "Topic"}, headers=h)
+    assert general.status_code == 201, general.text
+    bid, gid = book.json()["id"], general.json()["id"]
+
+    # Clearing the book on a book-based course is rejected.
+    r = await client.put(f"/api/v1/courses/{bid}", json={"book_title": ""}, headers=h)
+    assert r.status_code == 400, r.text
+
+    # Gaining a book on a general course is rejected.
+    r = await client.put(f"/api/v1/courses/{gid}", json={"book_title": "Book B"}, headers=h)
+    assert r.status_code == 400, r.text
+
+    # Renaming the book and editing other fields still work.
+    r = await client.put(
+        f"/api/v1/courses/{bid}",
+        json={"book_title": "Book A revised", "description": "d"},
+        headers=h,
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["book_title"] == "Book A revised"
+
+
+async def test_create_blank_book_name_normalizes_to_general(client):
+    """Ticket 16 review: a whitespace-only book name cannot smuggle a broken
+    derived kind through the API — it normalizes to a general course."""
+    from app.models.user import Role
+
+    await create_user_in_db("bn@x.com", "password123", role=Role.teacher)
+    t = await _tokens(client, "bn@x.com", "password123")
+    r = await client.post(
+        "/api/v1/courses",
+        json={"title": "Series", "book_title": "   "},
+        headers={"Authorization": f"Bearer {t['access_token']}"},
+    )
+    assert r.status_code == 201, r.text
+    assert r.json()["book_title"] is None
+
+
+async def test_course_list_returns_oldest_first_and_stays_ordered_after_delete(client):
+    """Ordering contract: course list is created_at ascending (old->new display index)."""
+    import uuid
+    from datetime import UTC, datetime
+
+    from sqlalchemy import update
+
+    from app.models.course import Course
+    from tests.helpers import open_db_session
+
+    await create_user_in_db("ord_c@x.com", "password123", role=Role.teacher)
+    toks = await _tokens(client, "ord_c@x.com", "password123")
+    h = {"Authorization": f"Bearer {toks['access_token']}"}
+    ids: list[str] = []
+    for title in ("C1", "C2", "C3"):
+        r = await client.post("/api/v1/courses", json={"title": title}, headers=h)
+        assert r.status_code == 201, r.text
+        ids.append(r.json()["id"])
+    stamps = [
+        datetime(2024, 1, 1, tzinfo=UTC),
+        datetime(2024, 1, 2, tzinfo=UTC),
+        datetime(2024, 1, 3, tzinfo=UTC),
+    ]
+    async with open_db_session() as session:
+        for cid, ts in zip(ids, stamps, strict=True):
+            await session.execute(
+                update(Course).where(Course.id == uuid.UUID(cid)).values(created_at=ts)
+            )
+        await session.commit()
+
+    lst = await client.get("/api/v1/courses", headers=h)
+    assert lst.status_code == 200, lst.text
+    assert [course["title"] for course in lst.json()] == ["C1", "C2", "C3"]
+
+    mid = next(course for course in lst.json() if course["title"] == "C2")
+    assert (await client.delete(f"/api/v1/courses/{mid['id']}", headers=h)).status_code == 204
+    lst2 = await client.get("/api/v1/courses", headers=h)
+    assert lst2.status_code == 200, lst2.text
+    assert [course["title"] for course in lst2.json()] == ["C1", "C3"]

@@ -4,9 +4,11 @@ Single-context repo. Use these terms exactly as defined; do not drift to synonym
 
 ## Core concepts
 
-- **Course = book (كتاب / شرح كتاب):** one book explained by the sheikh from start to end. The top-level container students join.
-- **Lesson = one recording session (درس / تسجيل):** one audio recording plus the pages explained in it. Has title, date, pages_from/to, one audio file, two transcript texts.
-- **Pages range:** the pages_from → pages_to explained in a lesson. Books are not pre-split into chapters; the range is the structure.
+- **Course = lesson series (سلسلة دروس):** one topic taught by the sheikh across lessons, optionally built around a single book. The top-level container students join. Kind (book-based vs general) is fixed at creation and derived from whether a book name was stored — no separate kind field.
+- **Book:** at most one named book per course. A series spanning several books is a general (bookless) course. A book-based course never loses its book name; a general course never gains one.
+- **Lesson = one recording session (درس / تسجيل):** one audio recording plus an optional description. Has title, date, optional pages range, one audio file, two transcript texts.
+- **Pages range:** optional per lesson, shown only for book-based courses. Books are not pre-split into chapters; where present, the range is the structure.
+- **Attachment (مرفق):** a handout file uploaded after its parent is created. Lesson attachments accept PDF or images (png/jpeg/webp); course attachments are PDF-only. On a book-based course exactly one course attachment may be designated the main book (الكتاب الأساسي); designating a new one silently replaces the old. Each file capped at 100MB.
 - **Transcript (voice):** TEXT pasted by admin/teacher containing what was said in the recording (manual MVP, e.g. via Whisper script). A DB column on lessons, not a file.
 - **Transcript (book):** TEXT pasted by admin/teacher containing the explained book pages for the lesson. A DB column on lessons, not a file.
 - **Recording:** V1 = audio only (~100–150MB). Schema field `media_type` is generic so video can be added in V2 without migration, but V1 UI accepts audio only.
@@ -35,7 +37,7 @@ Single-context repo. Use these terms exactly as defined; do not drift to synonym
 ## Assessment
 
 - **Exam:** belongs to a course, optionally to one lesson (null lesson = general/book-wide). Config: attempts, duration, open/close window, pass score, show-result mode (immediate vs after-publish).
-- **Question types:** MCQ (4 options, 1 correct), True/False, essay (max_score).
+- **Question types:** MCQ (2+ options, 1 correct), True/False, essay (max_score).
 - **Attempt:** one student sitting. MCQ/TF auto-scored on submit; essay pending until teacher grades with score + feedback.
 - **Gradebook:** read projection over attempts per course, with CSV export. Scores visible to students only per the exam's publish setting.
 

@@ -49,10 +49,14 @@ async def list_my_attempts(db: DbDep, actor: CurrentUserDep, exam_id: str) -> li
 @router.get("/attempts/{attempt_id}", response_model=AttemptOut)
 async def get_attempt(db: DbDep, actor: CurrentUserDep, attempt_id: str) -> AttemptOut:
     try:
-        attempt, exam, questions, answers = await attempt_service.get_attempt(db, actor, attempt_id)
+        attempt, exam, questions, answers, is_writer = await attempt_service.get_attempt(
+            db, actor, attempt_id
+        )
     except _ATTEMPT_ERRORS as e:
         raise HTTPException(status_code=_error_status(e), detail=e.message) from None
-    show = attempt_service.show_grades_for(exam, attempt)
+    # Writers see everything (mirrors the gradebook); students follow the
+    # exam's immediate vs after-publish setting.
+    show = is_writer or attempt_service.show_grades_for(exam, attempt)
     return to_attempt_out(attempt, questions, answers, show_grades=show)
 
 
