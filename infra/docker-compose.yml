@@ -64,7 +64,10 @@ services:
       SMTP_HOST: mailpit
       SMTP_PORT: 1025
       SMTP_FROM: ${SMTP_FROM:-Majlis <no-reply@majlis.local>}
-      FRONTEND_URL: http://localhost:8080
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:8080}
+      # First-admin bootstrap (seeded on API startup; no-op when unset).
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
       # Seam 3 storage (ticket 05): Cloudflare R2 credentials come from the
       # shell environment (or an `infra/.env` file) — never hardcoded here.
       # R2 CORS (set once in the Cloudflare dashboard for the bucket).
