@@ -84,6 +84,221 @@ html.dark {
   --sand: #1b2742;
 }
 
+/* ---- Ticket 17 tactile foundation ----
+   Face/edge/ink derive from primary/secondary so both modes stay correct.
+   Agents: use these vars + var(--ease-tactile); never hardcode press colors.
+   Depths mirror dqnamo kitchen: 3px firm edge, 2px press travel. */
+:root {
+  --ease-tactile: cubic-bezier(0.23, 1, 0.32, 1);
+  --tactile-depth: 3px;
+  --tactile-press: 2px;
+  --face-primary: var(--primary);
+  --edge-primary: var(--primary-ink);
+  --face-secondary: var(--secondary);
+  --edge-secondary: #7c3325; /* darker terracotta edge for the light-mode face */
+}
+html.dark {
+  /* Depth must READ on night blue: mid-tone edges under the gold/emerald
+     faces (the light-mode near-black inks vanish here). Text inks above
+     are untouched — contrast ≥ 4.5:1 still holds. */
+  --edge-primary: #7a5f16;
+  --edge-secondary: #0b6b4e;
+}
+
+/* Ticket 17 dropzone (agent C)
+   Magnetic upload target: idle = sand-dashed border, approach (data-near) =
+   gold glow scaled by --dz-proximity (0..1, set from drag distance in
+   DropZone.tsx), direct hover/drop (data-over) = strongest glow + gold tint.
+   Pull travel is springs via TACTILE_SPRING in the component; this block only
+   paints. Static under reduced-motion (global guard kills transitions; the
+   explicit transform kill covers the spring). RTL-safe: symmetric only. */
+.dropzone {
+  --dz-proximity: 0;
+  position: relative;
+  background-color: var(--surface);
+  border: 1.5px dashed var(--border);
+  border-radius: 1rem;
+  padding: 1rem;
+  text-align: center;
+  cursor: pointer;
+  transition:
+    border-color 200ms var(--ease-tactile),
+    box-shadow 200ms var(--ease-tactile),
+    background-color 200ms var(--ease-tactile);
+}
+.dropzone[data-near="true"] {
+  border-color: var(--gold);
+  border-style: solid;
+  box-shadow: 0 0 calc(6px + var(--dz-proximity) * 18px) rgba(212, 175, 55, 0.55);
+}
+.dropzone[data-over="true"] {
+  border-color: var(--gold);
+  border-style: solid;
+  background-color: color-mix(in srgb, var(--gold) 10%, var(--surface));
+  box-shadow: 0 0 28px rgba(212, 175, 55, 0.65);
+}
+.dropzone[data-disabled="true"] {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+.dropzone-label {
+  display: block;
+  cursor: pointer;
+}
+.dropzone[data-disabled="true"] .dropzone-label {
+  cursor: not-allowed;
+}
+.dropzone-title {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+.dropzone-hint {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+.dropzone-chosen {
+  margin-top: 0.5rem;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+/* Keyboard fallback: visually hidden but tab-focusable; the zone shows the
+   focus ring via :has so keyboard users see where they are. */
+.dropzone-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.dropzone:has(.dropzone-input:focus-visible) {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .dropzone {
+    transform: none !important;
+  }
+}
+
+/* Ticket 17 gold foil (agent E) — gold-only sheen, one surface (main-book
+   badge). Restrained: a faint gold wash + soft specular glow tracking
+    --foil-x/--foil-y (pointer, driven by springs in GoldFoil.tsx) plus a
+    ±6% --foil-scroll drift with page scroll. The sheen sits
+   behind the text (isolated wrapper + z-index -1) so the badge keeps
+   body-color text contrast ≥ 4.5:1 in both modes. Never rainbow. */
+.gold-foil {
+  position: relative;
+  display: inline-block;
+  isolation: isolate;
+  border-radius: 999px;
+}
+.gold-foil-sheen {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0.35;
+  background:
+    radial-gradient(
+      circle at var(--foil-x, 50%) calc(var(--foil-y, 50%) + var(--foil-scroll, 0%)),
+      rgba(212, 175, 55, 0.32),
+      rgba(212, 175, 55, 0) 72%
+    ),
+    linear-gradient(
+      135deg,
+      rgba(212, 175, 55, 0) 32%,
+      rgba(212, 175, 55, 0.18) 50%,
+      rgba(212, 175, 55, 0) 68%
+    );
+  transition: opacity 200ms var(--ease-tactile);
+}
+.gold-foil:hover .gold-foil-sheen {
+  opacity: 0.55;
+}
+html.dark .gold-foil-sheen {
+  opacity: 0.4;
+}
+html.dark .gold-foil:hover .gold-foil-sheen {
+  opacity: 0.6;
+}
+.gold-foil--static .gold-foil-sheen {
+  display: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .gold-foil-sheen {
+    display: none;
+  }
+}
+
+/* Ticket 17 cassette (agent D) — tactile lesson tape (شريط الدرس).
+   Surface-color shell with a thin gold frame; star-form reels spin only
+   while playing. Press depth reuses --tactile-depth/--tactile-press and the
+   mode-aware btn-primary face + --edge-primary edge (never hardcoded). */
+.cassette {
+  background-color: var(--surface);
+  border: 1px solid var(--gold);
+  /* Arch stack (no crossings): the cassette curve (64px) cuts ~15px inward
+     by the window's depth, so the window starts 21px in with its own 44px
+     echo — every corner stays inside its parent's curve. */
+  border-radius: 64px 64px 14px 14px;
+  padding: 22px 20px 12px;
+}
+.cassette-window {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background-color: var(--sand);
+  border: 1px solid var(--border);
+  border-radius: 44px 44px 12px 12px;
+  padding: 8px 22px;
+  margin-bottom: 10px;
+  color: var(--gold);
+}
+.cassette-reel {
+  display: inline-flex;
+  flex-shrink: 0;
+}
+.cassette-reel-star {
+  display: block;
+}
+/* Ticket 19: the decorative tape hairline is gone — the range input below
+   is the single source of progress truth (no parallel bars). */
+.cassette-reel.is-spinning .cassette-reel-star {
+  animation: cassette-spin 2.4s linear infinite;
+}
+@keyframes cassette-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+/* Tactile press: motion (TACTILE_SPRING) owns the travel, CSS owns the edge. */
+.cassette-play {
+  box-shadow: 0 var(--tactile-depth) 0 var(--edge-primary);
+  transition:
+    box-shadow 200ms var(--ease-tactile),
+    background-color 200ms,
+    color 200ms,
+    opacity 200ms;
+}
+.cassette-play:active {
+  box-shadow: 0 1px 0 var(--edge-primary);
+}
+@media (prefers-reduced-motion: reduce) {
+  .cassette-reel.is-spinning .cassette-reel-star {
+    animation: none;
+  }
+  .cassette-play {
+    transition: none;
+  }
+}
+
 html {
   scroll-behavior: smooth;
 }
@@ -217,6 +432,16 @@ html.dark .zellige {
   left: 10px;
   transform: rotate(180deg);
 }
+/* LTR mirror (English pilot): corners follow the reading direction so the
+   flourish never sits on top of left-aligned labels. */
+html[dir="ltr"] .arabesque::before {
+  right: auto;
+  left: 10px;
+}
+html[dir="ltr"] .arabesque::after {
+  left: auto;
+  right: 10px;
+}
 
 /* MUST use background-color (never shorthand) so zellige survives */
 .card {
@@ -224,17 +449,44 @@ html.dark .zellige {
   border: 1px solid var(--border);
 }
 
-/* ---- Mode-aware solids (never raw text-white on primary) ---- */
+/* ---- Mode-aware solids (never raw text-white on primary) ----
+   Ticket 17 tactile: face color + firm edge; press travels down and the
+   edge collapses; release springs back. Text colors below are the
+   contrast-verified mode-aware inks — do not change them. */
 .btn-primary {
-  background: var(--primary);
+  background: var(--face-primary);
   color: #fff;
+  box-shadow: 0 var(--tactile-depth) 0 var(--edge-primary);
+  transform: translateY(0);
+  transition:
+    transform 200ms var(--ease-tactile),
+    box-shadow 200ms var(--ease-tactile),
+    background-color 200ms,
+    color 200ms,
+    opacity 200ms;
+}
+.btn-primary:active:not(:disabled) {
+  transform: translateY(var(--tactile-press));
+  box-shadow: 0 1px 0 var(--edge-primary);
 }
 html.dark .btn-primary {
   color: #1a1405;
 }
 .btn-secondary {
-  background: var(--secondary);
+  background: var(--face-secondary);
   color: #fff;
+  box-shadow: 0 var(--tactile-depth) 0 var(--edge-secondary);
+  transform: translateY(0);
+  transition:
+    transform 200ms var(--ease-tactile),
+    box-shadow 200ms var(--ease-tactile),
+    background-color 200ms,
+    color 200ms,
+    opacity 200ms;
+}
+.btn-secondary:active:not(:disabled) {
+  transform: translateY(var(--tactile-press));
+  box-shadow: 0 1px 0 var(--edge-secondary);
 }
 html.dark .btn-secondary {
   color: #052e22;
@@ -298,8 +550,12 @@ html.dark .toast-msg {
     transform: translateX(-100%);
   }
 }
+/* Ticket 19: the seek bar fills RTL (right→left) like the control row it
+   lives in — elapsed label at the inline-start (right), duration at the
+   inline-end (left), fill growing start→end. The old ltr fill contradicted
+   the label order and read as swapped timers. */
 .audio-progress {
-  direction: ltr;
+  direction: rtl;
 }
 input[type="range"] {
   accent-color: var(--primary);

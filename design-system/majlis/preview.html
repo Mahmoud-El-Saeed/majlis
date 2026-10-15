@@ -93,6 +93,26 @@ tailwind.config = {
   html.dark .btn-primary{ color:#1A1405; }
   .btn-secondary{ background:var(--secondary); color:#fff; }
   html.dark .btn-secondary{ color:#052E22; }
+
+  /* ---- Ticket 17 tactile foundation (mirrors frontend/src/index.css) ---- */
+  :root{
+    --ease-tactile:cubic-bezier(.23,1,.32,1);
+    --tactile-depth:3px; --tactile-press:2px;
+    --face-primary:var(--primary); --edge-primary:var(--primary-ink);
+    --face-secondary:var(--secondary); --edge-secondary:#7c3325;
+  }
+  html.dark{ --edge-primary:#7A5F16; --edge-secondary:#0B6B4E; }
+  .tactile-demo{
+    position:relative; font-weight:700;
+    transition:transform 200ms var(--ease-tactile), box-shadow 200ms var(--ease-tactile);
+  }
+  .tactile-demo:active{ transform:translateY(var(--tactile-press)); }
+  .tactile-demo-primary{ background:var(--face-primary); color:#fff; box-shadow:0 var(--tactile-depth) 0 var(--edge-primary); }
+  html.dark .tactile-demo-primary{ color:#1A1405; }
+  .tactile-demo-primary:active{ box-shadow:0 1px 0 var(--edge-primary); }
+  .tactile-demo-secondary{ background:var(--face-secondary); color:#fff; box-shadow:0 var(--tactile-depth) 0 var(--edge-secondary); }
+  html.dark .tactile-demo-secondary{ color:#052E22; }
+  .tactile-demo-secondary:active{ box-shadow:0 1px 0 var(--edge-secondary); }
   .badge-primary{ background:var(--primary); color:#fff; }
   html.dark .badge-primary{ color:#1A1405; }
   .badge-secondary{ background:var(--secondary); color:#fff; }
@@ -107,7 +127,7 @@ tailwind.config = {
   .skeleton{ position:relative; overflow:hidden; background:var(--sand); }
   .skeleton::after{ content:''; position:absolute; inset:0; background:linear-gradient(90deg,transparent,rgba(255,255,255,.6),transparent); animation:shimmer 1.4s infinite; }
   @keyframes shimmer{ from{transform:translateX(100%)} to{transform:translateX(-100%)} }
-  .audio-progress{ direction:ltr; }
+  .audio-progress{ direction:rtl; }
   input[type=range]{ accent-color:var(--primary); }
 </style>
 </head>
@@ -374,6 +394,20 @@ tailwind.config = {
       <input id="q" placeholder="اسأل بالعربية من شرح الشيخ…" class="flex-1 rounded-xl px-4 py-3 card border placeholder:opacity-60" style="border-color:var(--border)">
       <button class="clickable transition-ui  rounded-xl px-6 hover:opacity-90 btn-primary">إرسال</button>
     </form>
+  </section>
+
+  <!-- Ticket 17 tactile foundation proof: press-and-hold the buttons, toggle ليلي/نهاري -->
+  <section id="tactile" class="card arabesque rounded-2xl p-6 sm:p-8 shadow-sm space-y-4">
+    <h2 class="font-heading text-xl font-bold">أساس اللمس — اضغط الزر لأسفل ثم أفلت</h2>
+    <p class="muted-t text-sm">وجه + حرف ثابت 3px + حركة ضغط 2px • المنحنى <span dir="ltr">cubic-bezier(.23,1,.32,1)</span> • النص الغامق على الذهبي/الزمردي في الليلي (تباين ≥ 4.5:1)</p>
+    <div class="flex flex-wrap items-center gap-4">
+      <button class="tactile-demo tactile-demo-primary clickable rounded-xl px-6 py-2.5">أساسي لمسي</button>
+      <button class="tactile-demo tactile-demo-secondary clickable rounded-xl px-6 py-2.5">ثانوي لمسي</button>
+      <span class="flex items-center gap-2 text-xs muted-t">
+        <span class="inline-block w-5 h-5 rounded-md border" style="background:var(--face-primary); border-color:var(--edge-primary)" aria-hidden="true"></span> وجه/حرف الأساسي
+        <span class="inline-block w-5 h-5 rounded-md border" style="background:var(--face-secondary); border-color:var(--edge-secondary)" aria-hidden="true"></span> وجه/حرف الثانوي
+      </span>
+    </div>
   </section>
 
   <!-- Footer with zellige -->
