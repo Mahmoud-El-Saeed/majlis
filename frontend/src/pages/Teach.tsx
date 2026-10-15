@@ -9,6 +9,7 @@ import { localizeDetail, str } from '../i18n'
 import { Fab } from '../components/Fab'
 import { Modal } from '../components/Modal'
 import { ConfirmDialog } from '../components/ConfirmDialog'
+import { DropZone } from '../components/DropZone'
 import { NumberBadge } from '../components/NumberBadge'
 import { SearchBox } from '../components/SearchBox'
 import { StarDivider } from '../components/Star8'
@@ -361,15 +362,12 @@ export function LessonUpload({ lessonId, onDone, defaultOpen = true }: { lessonI
         </button>
       ) : (
       <>
-      <label className="block text-sm">
-        ملف صوتي (V1 صوت فقط ~100–150MB)
-        <input
-          type="file"
-          accept="audio/*"
-          onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-          className="mt-1 block w-full text-sm"
-        />
-      </label>
+      <DropZone
+        accept="audio/*"
+        onFile={(picked) => setFile(picked)}
+        label="ملف صوتي (V1 صوت فقط ~100–150MB)"
+        fileName={file?.name ?? null}
+      />
       {progress !== null && (
         <div className="mt-2 h-2 rounded-full" style={{ backgroundColor: 'var(--sand)' }} role="progressbar" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100}>
           <div className="h-2 rounded-full" style={{ width: `${progress}%`, backgroundColor: 'var(--primary)' }} />

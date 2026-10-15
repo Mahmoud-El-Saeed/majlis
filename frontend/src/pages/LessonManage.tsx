@@ -1,17 +1,33 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { motion } from 'motion/react'
 import { ApiError } from '../api/client'
 import { api } from '../api/http'
-import type { AttachmentOut, CourseOut, LessonOut, LessonSummaryOut, UploadUrlOut } from '../api/types'
+import type {
+  AttachmentOut,
+  CourseOut,
+  LessonOut,
+  LessonSummaryOut,
+  PlayOut,
+  UploadUrlOut,
+} from '../api/types'
 import { localizeDetail, str } from '../i18n'
-import { courseHasBook, MAX_ATTACHMENT_BYTES, putFileToUrl } from '../features/courses/helpers'
+import {
+  courseHasBook,
+  MAX_ATTACHMENT_BYTES,
+  openAttachmentFile,
+  putFileToUrl,
+} from '../features/courses/helpers'
 import { LessonBadge } from '../components/Badges'
 import { ConfirmDialog } from '../components/ConfirmDialog'
+import { DropZone } from '../components/DropZone'
+import { DynamicButton, type DynamicButtonState } from '../components/DynamicButton'
 import { Skeleton } from '../components/Skeleton'
+import { TACTILE_SPRING, useReducedMotion } from '../components/tactile'
 import { useToast } from '../components/Toast'
 import { LessonUpload } from './Teach'
-import { btnPrimary, fieldCls, fieldStyle } from './Auth'
+import { fieldCls, fieldStyle } from './Auth'
 
 export function LessonManagePage() {
   const { id: courseId = '', lessonId = '' } = useParams()
@@ -103,16 +119,18 @@ export function LessonManagePage() {
             hasBook={hasBook}
             onSave={(draft) => saveEdit.mutate(draft)}
             saving={saveEdit.isPending}
+            saveFailed={saveEdit.isError}
           />
           <section aria-label="الملف الصوتي" className="card mt-4 rounded-2xl p-5">
             <h2 className="font-heading mb-2 font-bold">الملف الصوتي</h2>
-            <LessonUpload
+            <LessonAudioManager
+              lesson={lesson.data}
               lessonId={lessonId}
-              defaultOpen={lesson.data.status !== 'ready'}
               onDone={() => {
                 qc.invalidateQueries({ queryKey: ['lesson-manage', lessonId] })
                 qc.invalidateQueries({ queryKey: ['lessons-manage', courseId] })
               }}
+              onDeleteRequest={() => setConfirmDelete(true)}
             />
           </section>
           <section aria-label="مرفقات الدرس" className="card mt-4 rounded-2xl p-5">
@@ -152,22 +170,91 @@ function LessonInfoForm({
   hasBook,
   onSave,
   saving,
+  saveFailed,
 }: {
   initial: LessonOut
   hasBook: boolean
   onSave: (draft: LessonOut) => void
   saving: boolean
+  saveFailed: boolean
 }) {
   const [draft, setDraft] = useState(initial)
+  // Collapsed by default: the header below keeps title + status visible so
+  // nothing is lost; the chevron toggles the full edit form.
+  const [expanded, setExpanded] = useState(false)
+  const formId = useId()
+  const reduceMotion = useReducedMotion()
+  // Done flash: show تم الحفظ briefly after a successful save only —
+  // failures surface through the parent alert, never the done label.
+  const [savedFlash, setSavedFlash] = useState(false)
+  const wasSaving = useRef(false)
+  useEffect(() => {
+    if (saving) {
+      wasSaving.current = true
+      setSavedFlash(false)
+      return
+    }
+    if (wasSaving.current) {
+      wasSaving.current = false
+      if (!saveFailed) {
+        setSavedFlash(true)
+        const t = window.setTimeout(() => setSavedFlash(false), 1600)
+        return () => window.clearTimeout(t)
+      }
+    }
+  }, [saving, saveFailed])
+  const dynState: DynamicButtonState = saving ? 'busy' : savedFlash ? 'done' : 'idle'
   return (
-    <form
-      className="card mt-3 grid gap-2 rounded-2xl p-5"
-      onSubmit={(e) => {
-        e.preventDefault()
-        onSave(draft)
-      }}
-    >
-      <h2 className="font-heading font-bold">بيانات الدرس</h2>
+    <section aria-label="بيانات الدرس" className="card mt-3 rounded-2xl p-5">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          <h2 className="font-heading font-bold">بيانات الدرس</h2>
+          <span dir="auto" className="muted-t truncate text-sm">
+            {initial.title}
+          </span>
+          <LessonBadge status={initial.status} />
+        </div>
+        <motion.button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          aria-expanded={expanded}
+          aria-controls={formId}
+          aria-label={expanded ? str.collapseInfo : str.expandInfo}
+          whileTap={reduceMotion ? undefined : { scale: 0.94 }}
+          transition={TACTILE_SPRING}
+          className="transition-ui clickable flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border"
+          style={{ borderColor: 'var(--border)' }}
+        >
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 16 16"
+            width="16"
+            height="16"
+            fill="none"
+            style={{
+              transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)',
+              transition: reduceMotion ? 'none' : 'transform 200ms var(--ease-tactile)',
+            }}
+          >
+            <path
+              d="M4 6l4 4 4-4"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </motion.button>
+      </div>
+      {expanded && (
+        <form
+          id={formId}
+          className="mt-2 grid gap-2"
+          onSubmit={(e) => {
+            e.preventDefault()
+            onSave(draft)
+          }}
+        >
       <label>
         <span className="mb-1 block text-sm">العنوان</span>
         <input
@@ -251,10 +338,152 @@ function LessonInfoForm({
           style={fieldStyle}
         />
       </label>
-      <button type="submit" disabled={saving} className={btnPrimary}>
-        حفظ
-      </button>
-    </form>
+          <DynamicButton type="submit" state={dynState} width="full" />
+        </form>
+      )}
+    </section>
+  )
+}
+
+function formatMmSs(totalSeconds: number): string {
+  if (!Number.isFinite(totalSeconds) || totalSeconds < 0) return '00:00'
+  const m = Math.floor(totalSeconds / 60)
+  const s = Math.floor(totalSeconds % 60)
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+}
+
+// Lazy audio duration: fetches the short-lived playback URL, preloads
+// metadata through a short-lived Audio element, caches the mm:ss label in
+// state, and stays silent on any failure (badge + actions still render).
+function useLessonAudioDuration(lessonId: string, audioKey: string | null, enabled: boolean) {
+  const [duration, setDuration] = useState<string | null>(null)
+  useEffect(() => {
+    setDuration(null)
+  }, [lessonId, audioKey])
+  useEffect(() => {
+    if (!enabled) return
+    let cancelled = false
+    let el: HTMLAudioElement | null = null
+    void (async () => {
+      try {
+        const p = await api.get<PlayOut>(`/lessons/${lessonId}/play`)
+        if (cancelled || !p?.playback_url) return
+        el = new Audio()
+        el.preload = 'metadata'
+        el.src = p.playback_url
+        const secs: number = await new Promise<number>((resolve, reject) => {
+          const a = el
+          if (!a) {
+            reject(new Error('no element'))
+            return
+          }
+          const onLoaded = () => {
+            a.removeEventListener('loadedmetadata', onLoaded)
+            a.removeEventListener('error', onError)
+            resolve(a.duration)
+          }
+          const onError = () => {
+            a.removeEventListener('loadedmetadata', onLoaded)
+            a.removeEventListener('error', onError)
+            reject(new Error('metadata'))
+          }
+          a.addEventListener('loadedmetadata', onLoaded)
+          a.addEventListener('error', onError)
+        })
+        if (cancelled) return
+        if (Number.isFinite(secs) && secs >= 0) setDuration(formatMmSs(secs))
+      } catch {
+        // Silent: duration simply stays hidden.
+      }
+    })()
+    return () => {
+      cancelled = true
+      if (el) {
+        el.removeAttribute('src')
+        try {
+          el.load()
+        } catch {
+          // jsdom / detached element — ignore.
+        }
+        el = null
+      }
+    }
+  }, [lessonId, audioKey, enabled])
+  return duration
+}
+
+// Post-upload audio summary. Before any upload (status !== ready) the
+// picker-first LessonUpload UI is kept exactly as-is. Once ready, a summary
+// line (status badge + lazy mm:ss + replace/delete) replaces the bare
+// toggle; استبدال reopens the picker, حذف reuses the page's existing
+// lesson-delete confirm (no audio-only delete endpoint exists).
+function LessonAudioManager({
+  lesson,
+  lessonId,
+  onDone,
+  onDeleteRequest,
+}: {
+  lesson: LessonOut
+  lessonId: string
+  onDone: () => void
+  onDeleteRequest: () => void
+}) {
+  const [replacing, setReplacing] = useState(false)
+  const ready = lesson.status === 'ready'
+  const duration = useLessonAudioDuration(lessonId, lesson.audio_key ?? null, ready && !replacing)
+  if (!ready || replacing) {
+    return (
+      <div>
+        <LessonUpload
+          lessonId={lessonId}
+          defaultOpen={replacing ? true : lesson.status !== 'ready'}
+          onDone={() => {
+            setReplacing(false)
+            onDone()
+          }}
+        />
+        {replacing && ready && (
+          <button
+            type="button"
+            onClick={() => setReplacing(false)}
+            className="transition-ui clickable mt-2 rounded-xl border px-4 py-1.5 text-sm"
+            style={{ borderColor: 'var(--border)' }}
+          >
+            {str.cancel}
+          </button>
+        )}
+      </div>
+    )
+  }
+  return (
+    <div className="mt-2 rounded-xl border p-3" style={{ borderColor: 'var(--border)' }}>
+      <div className="flex flex-wrap items-center gap-2">
+        <LessonBadge status={lesson.status} />
+        {duration && (
+          <span dir="ltr" className="text-sm tabular-nums">
+            {duration}
+          </span>
+        )}
+        <span className="flex flex-wrap items-center gap-2" style={{ marginInlineStart: 'auto' }}>
+          <button
+            type="button"
+            onClick={() => setReplacing(true)}
+            className="transition-ui clickable rounded-xl border px-3 py-1 text-sm"
+            style={{ borderColor: 'var(--border)' }}
+          >
+            {str.replaceFile}
+          </button>
+          <button
+            type="button"
+            onClick={onDeleteRequest}
+            className="transition-ui clickable rounded-xl border px-3 py-1 text-sm"
+            style={{ borderColor: 'var(--secondary)' }}
+          >
+            {str.deleteFile}
+          </button>
+        </span>
+      </div>
+    </div>
   )
 }
 
@@ -275,8 +504,24 @@ export function LessonAttachmentsManager({
   const [title, setTitle] = useState('')
   const [file, setFile] = useState<File | null>(null)
   const [busy, setBusy] = useState(false)
+  // Done flash only on true success (set inside try, never on catch).
+  const [doneFlash, setDoneFlash] = useState(false)
+  const flashDone = () => {
+    setDoneFlash(true)
+    window.setTimeout(() => setDoneFlash(false), 1600)
+  }
   const [confirmDelete, setConfirmDelete] = useState<{ id: string; title: string } | null>(null)
   const [deleteBusy, setDeleteBusy] = useState(false)
+  // Per-row replace: inline DropZone swap + upload reusing the same
+  // upload-url → PUT → confirm steps as the create form.
+  const [replaceId, setReplaceId] = useState<string | null>(null)
+  const [rowFiles, setRowFiles] = useState<Record<string, File | null>>({})
+  const [rowBusy, setRowBusy] = useState<Record<string, boolean>>({})
+  const [rowDone, setRowDone] = useState<Record<string, boolean>>({})
+  const flashRowDone = (attId: string) => {
+    setRowDone((f) => ({ ...f, [attId]: true }))
+    window.setTimeout(() => setRowDone((f) => ({ ...f, [attId]: false })), 1600)
+  }
 
   const list = useQuery({
     queryKey: ['lesson-attachments-manage', lessonId],
@@ -324,6 +569,7 @@ export function LessonAttachmentsManager({
       setTitle('')
       setFile(null)
       refresh()
+      flashDone()
     } catch (ex) {
       toast(ex instanceof ApiError ? localizeDetail(ex.detail) : 'فشل الرفع — أعد المحاولة برابط جديد')
     } finally {
@@ -341,6 +587,47 @@ export function LessonAttachmentsManager({
       toast(ex instanceof ApiError ? localizeDetail(ex.detail) : 'تعذّر الحذف')
     } finally {
       setDeleteBusy(false)
+    }
+  }
+
+  // Per-row replace upload: same ext/size gates and upload-url → PUT →
+  // confirm steps (and identical rejection toasts) as the create form.
+  const replaceUpload = async (attId: string) => {
+    const picked = rowFiles[attId]
+    if (!picked) return
+    const ext = extOf(picked.name)
+    if (!LESSON_ATTACHMENT_EXTS.includes(ext as (typeof LESSON_ATTACHMENT_EXTS)[number])) {
+      toast('صيغة غير مدعومة — المسموح: PDF و PNG و JPEG و WEBP')
+      return
+    }
+    if (picked.size > MAX_ATTACHMENT_BYTES) {
+      toast('الملف كبير (أقصى 100MB) — يفضل ضغطه ثم إعادة المحاولة')
+      return
+    }
+    setRowBusy((b) => ({ ...b, [attId]: true }))
+    try {
+      const u = await api.post<UploadUrlOut>(`/lesson-attachments/${attId}/upload-url`, {
+        content_type: contentTypeOf(picked),
+        file_ext: ext,
+      })
+      await putFileToUrl(u.upload_url, picked, contentTypeOf(picked))
+      await api.post(`/lesson-attachments/${attId}/confirm`, { object_key: u.object_key })
+      setRowFiles((f) => ({ ...f, [attId]: null }))
+      setReplaceId(null)
+      refresh()
+      flashRowDone(attId)
+    } catch (ex) {
+      toast(ex instanceof ApiError ? localizeDetail(ex.detail) : 'فشل الرفع — أعد المحاولة برابط جديد')
+    } finally {
+      setRowBusy((b) => ({ ...b, [attId]: false }))
+    }
+  }
+
+  const openFile = async (attId: string) => {
+    try {
+      await openAttachmentFile('lesson', attId)
+    } catch (ex) {
+      toast(ex instanceof ApiError ? localizeDetail(ex.detail) : 'تعذّر الفتح')
     }
   }
 
@@ -363,28 +650,93 @@ export function LessonAttachmentsManager({
           عنوان المرفق
           <input value={title} onChange={(e) => setTitle(e.target.value)} required className={fieldCls} style={fieldStyle} />
         </label>
-        <label className="text-sm">
-          ملف (PDF/PNG/JPEG/WEBP — أقصى 100MB)
-          <input
-            type="file"
-            accept=".pdf,.png,.jpg,.jpeg,.webp"
-            onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-            className="mt-1 block w-full text-sm"
-          />
-        </label>
-        <button type="submit" disabled={!file || busy} className="btn-secondary transition-ui rounded-xl px-4 py-1.5">
-          إضافة ورفع
-        </button>
+        <DropZone
+          accept=".pdf,.png,.jpg,.jpeg,.webp"
+          onFile={(picked) => setFile(picked)}
+          disabled={busy}
+          label="ملف (PDF/PNG/JPEG/WEBP — أقصى 100MB)"
+          fileName={file?.name ?? null}
+        />
+        <DynamicButton
+          type="submit"
+          width="full"
+          variant="secondary"
+          disabled={!file || busy}
+          state={busy ? 'busy' : doneFlash ? 'done' : 'idle'}
+          idleLabel={str.addAndUpload}
+          busyLabel={str.uploadingNow}
+          doneLabel={str.uploadDone}
+        />
       </form>
-      <ul className="mt-2 grid gap-1 text-sm">
+      <ul className="mt-2 grid gap-2 text-sm">
         {(list.data ?? []).map((a) => (
-          <li key={a.id} className="flex items-center justify-between gap-2">
-            <span>
-              {a.title} · <span className="muted-t">{a.has_file ? 'جاهز' : 'بانتظار الملف'}</span>
-            </span>
-            <button type="button" onClick={() => setConfirmDelete({ id: a.id, title: a.title })} className="underline">
-              حذف
-            </button>
+          <li key={a.id} className="rounded-xl border p-3" style={{ borderColor: 'var(--border)' }}>
+            <div className="flex flex-wrap items-center gap-2">
+              <p dir="auto" className="font-bold">
+                {a.title}
+              </p>
+              {a.has_file ? (
+                <span className="badge-primary transition-ui inline-flex items-center rounded-full px-3 py-1 text-xs font-bold">
+                  جاهز
+                </span>
+              ) : (
+                <span
+                  className="transition-ui inline-flex items-center rounded-full border px-3 py-1 text-xs font-bold"
+                  style={{ borderColor: 'var(--gold)' }}
+                >
+                  بانتظار الملف
+                </span>
+              )}
+            </div>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => openFile(a.id)}
+                disabled={!a.has_file}
+                className="btn-secondary transition-ui clickable rounded-xl px-4 py-1.5 text-sm"
+              >
+                {str.openFile}
+              </button>
+              <button
+                type="button"
+                onClick={() => setReplaceId((cur) => (cur === a.id ? null : a.id))}
+                aria-expanded={replaceId === a.id}
+                aria-controls={`replace-${a.id}`}
+                className="transition-ui clickable rounded-xl border px-4 py-1.5 text-sm"
+                style={{ borderColor: 'var(--border)' }}
+              >
+                {str.replaceFile}
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmDelete({ id: a.id, title: a.title })}
+                className="transition-ui clickable rounded-xl border px-4 py-1.5 text-sm"
+                style={{ borderColor: 'var(--secondary)' }}
+              >
+                {str.deleteFile}
+              </button>
+            </div>
+            {replaceId === a.id && (
+              <div id={`replace-${a.id}`} className="mt-2 grid gap-2">
+                <DropZone
+                  accept=".pdf,.png,.jpg,.jpeg,.webp"
+                  onFile={(picked) => setRowFiles((f) => ({ ...f, [a.id]: picked }))}
+                  disabled={!!rowBusy[a.id]}
+                  label="ملف (PDF/PNG/JPEG/WEBP — أقصى 100MB)"
+                  fileName={rowFiles[a.id]?.name ?? null}
+                />
+                <DynamicButton
+                  type="button"
+                  variant="secondary"
+                  disabled={!rowFiles[a.id] || rowBusy[a.id]}
+                  onClick={() => replaceUpload(a.id)}
+                  state={rowBusy[a.id] ? 'busy' : rowDone[a.id] ? 'done' : 'idle'}
+                  idleLabel={str.upload}
+                  busyLabel={str.uploadingNow}
+                  doneLabel={str.uploadDone}
+                />
+              </div>
+            )}
           </li>
         ))}
       </ul>

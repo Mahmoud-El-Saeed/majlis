@@ -152,7 +152,8 @@ async def join_with_code(db: AsyncSession, user: User, data: JoinIn) -> Enrollme
             raise EnrollmentError("Already enrolled in this course.")
         if existing.status == EnrollmentStatus.pending:
             raise EnrollmentError("Join request already pending review.")
-        # Rejected (or unblocked→rejected): soft re-apply with the new code.
+        # Rejected: soft re-apply with the new code (unblock restores
+        # pre-block access instead of bouncing through rejected).
         existing.status = EnrollmentStatus.pending
         existing.code_id = code.id
         existing.display_name = display_name
@@ -219,8 +220,10 @@ Decision = Literal["approve", "reject", "block", "unblock"]
 
 # Single transition table for the approval seam (spec: pending →
 # approved/rejected/blocked; rejected soft, blocked per-course ban).
-# target=None means "rejected for this state" with the paired message.
-_DECISIONS: dict[Decision, dict[EnrollmentStatus, EnrollmentStatus | str]] = {
+# A str target means "rejected for this state" with the paired message.
+# None (unblock from blocked only) means "restore status_before_block"
+# so unblock returns instant pre-block access; legacy NULL → approved.
+_DECISIONS: dict[Decision, dict[EnrollmentStatus, EnrollmentStatus | str | None]] = {
     "approve": {
         EnrollmentStatus.pending: EnrollmentStatus.approved,
         EnrollmentStatus.approved: EnrollmentStatus.approved,  # idempotent no-op
@@ -240,7 +243,7 @@ _DECISIONS: dict[Decision, dict[EnrollmentStatus, EnrollmentStatus | str]] = {
         EnrollmentStatus.blocked: EnrollmentStatus.blocked,  # idempotent no-op
     },
     "unblock": {
-        EnrollmentStatus.blocked: EnrollmentStatus.rejected,
+        EnrollmentStatus.blocked: None,  # restore pre-block access
         EnrollmentStatus.pending: "Enrollment is not blocked.",
         EnrollmentStatus.approved: "Enrollment is not blocked.",
         EnrollmentStatus.rejected: "Enrollment is not blocked.",
@@ -262,11 +265,33 @@ async def decide(db: AsyncSession, actor: User, enrollment_id: str, action: Deci
     _check_can_write(actor, course)
 
     outcome = _DECISIONS[action][enrollment.status]
-    if not isinstance(outcome, EnrollmentStatus):
-        # StrEnum members are str instances too, so test the enum type first.
+    if isinstance(outcome, EnrollmentStatus):
+        pass  # normal transition handled below
+    elif outcome is None:
+        # The only None cell is unblock-from-blocked: restore the status
+        # captured at block time (instant access, no re-apply). Legacy rows
+        # blocked before status_before_block existed carry NULL → approved;
+        # a stored blocked (unreachable via block, a no-op from blocked)
+        # also falls back to approved.
+        restore = enrollment.status_before_block
+        if restore is None or restore is EnrollmentStatus.blocked:
+            restore = EnrollmentStatus.approved
+        enrollment.status = restore
+        enrollment.status_before_block = None
+        enrollment.decided_by = actor.id
+        enrollment.decided_at = datetime.now(UTC)
+        await db.flush()
+        await db.refresh(enrollment)
+        return enrollment
+    else:
+        # StrEnum members are str instances too, so the enum branch runs
+        # first; here outcome is a plain rejection message.
         raise EnrollmentError(outcome)
     if outcome == enrollment.status:
         return enrollment  # idempotent: no transition, audit preserved
+    if action == "block":
+        # Remember pre-block access so a later unblock restores it instantly.
+        enrollment.status_before_block = enrollment.status
     enrollment.status = outcome
     enrollment.decided_by = actor.id
     enrollment.decided_at = datetime.now(UTC)

@@ -22,10 +22,13 @@ import { LessonBadge } from '../components/Badges'
 import { NumberBadge } from '../components/NumberBadge'
 import { SearchBox } from '../components/SearchBox'
 import { Fab } from '../components/Fab'
+import { GoldFoil } from '../components/GoldFoil'
 import { Modal } from '../components/Modal'
 import { ConfirmDialog } from '../components/ConfirmDialog'
+import { DropZone } from '../components/DropZone'
+import { DynamicButton } from '../components/DynamicButton'
 import { useToast } from '../components/Toast'
-import { btnPrimary, fieldCls, fieldStyle } from './Auth'
+import { fieldCls, fieldStyle } from './Auth'
 
 export function CourseManagePage() {
   const { id = '' } = useParams()
@@ -244,9 +247,15 @@ function NewLessonForm({
           <span className="mb-1 block text-sm">نص صفحات الكتاب</span>
           <textarea value={book} onChange={(e) => setBook(e.target.value)} rows={4} className={fieldCls} style={fieldStyle} />
         </label>
-        <button type="submit" className={btnPrimary}>
-          إنشاء الدرس
-        </button>
+        {/* Success navigates away, so only idle/busy states are reachable. */}
+        <DynamicButton
+          type="submit"
+          width="full"
+          state={create.isPending ? 'busy' : 'idle'}
+          idleLabel={str.createLesson}
+          busyLabel={str.creatingLesson}
+          doneLabel={str.createLesson}
+        />
       </form>
       {err && (
         <p role="alert" className="mt-2 text-sm" style={{ color: 'var(--secondary)' }}>
@@ -264,6 +273,12 @@ function CourseAttachmentsManager({ courseId, hasBook }: { courseId: string; has
   const [description, setDescription] = useState('')
   const [files, setFiles] = useState<Record<string, File | null>>({})
   const [busy, setBusy] = useState<Record<string, boolean>>({})
+  // Per-attachment done flash, set only on true success (inside try).
+  const [doneFlash, setDoneFlash] = useState<Record<string, boolean>>({})
+  const flashDone = (attId: string) => {
+    setDoneFlash((f) => ({ ...f, [attId]: true }))
+    window.setTimeout(() => setDoneFlash((f) => ({ ...f, [attId]: false })), 1600)
+  }
   const [confirmDelete, setConfirmDelete] = useState<{ id: string; title: string } | null>(null)
   const [deleteBusy, setDeleteBusy] = useState(false)
 
@@ -305,6 +320,7 @@ function CourseAttachmentsManager({ courseId, hasBook }: { courseId: string; has
       await api.post(`/course-attachments/${attId}/confirm`, { object_key: u.object_key })
       setFiles((f) => ({ ...f, [attId]: null }))
       refresh()
+      flashDone(attId)
     } catch (ex) {
       toast(ex instanceof ApiError ? localizeDetail(ex.detail) : 'فشل الرفع — أعد المحاولة برابط جديد')
     } finally {
@@ -366,31 +382,36 @@ function CourseAttachmentsManager({ courseId, hasBook }: { courseId: string; has
               <p className="font-bold">
                 {a.title}{' '}
                 {a.is_main_book && (
-                  <span className="rounded-full border px-2 py-0.5 text-xs" style={{ borderColor: 'var(--gold)' }}>
-                    الكتاب الأساسي
-                  </span>
+                  <GoldFoil>
+                    <span className="rounded-full border px-2 py-0.5 text-xs" style={{ borderColor: 'var(--gold)' }}>
+                      الكتاب الأساسي
+                    </span>
+                  </GoldFoil>
                 )}
               </p>
               <p className="muted-t text-xs">{a.has_file ? 'جاهز' : 'بانتظار رفع الملف'}</p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               {!a.has_file && (
-                <label className="flex items-center gap-2 text-xs">
-                  <input
-                    type="file"
+                <div className="flex items-center gap-2 text-xs">
+                  <DropZone
                     accept=".pdf,application/pdf"
-                    onChange={(e) => setFiles((f) => ({ ...f, [a.id]: e.target.files?.[0] ?? null }))}
-                    className="max-w-44 text-xs"
+                    onFile={(picked) => setFiles((f) => ({ ...f, [a.id]: picked }))}
+                    disabled={!!busy[a.id]}
+                    label={str.pdfFileLabel}
+                    fileName={files[a.id]?.name ?? null}
                   />
-                  <button
+                  <DynamicButton
                     type="button"
+                    variant="secondary"
                     disabled={!files[a.id] || busy[a.id]}
                     onClick={() => upload(a.id)}
-                    className="btn-secondary transition-ui rounded-lg px-3 py-1"
-                  >
-                    رفع
-                  </button>
-                </label>
+                    state={busy[a.id] ? 'busy' : doneFlash[a.id] ? 'done' : 'idle'}
+                    idleLabel={str.upload}
+                    busyLabel={str.uploadingNow}
+                    doneLabel={str.uploadDone}
+                  />
+                </div>
               )}
               {a.has_file && (
                 <button type="button" onClick={() => openFile(a.id)} className="underline">

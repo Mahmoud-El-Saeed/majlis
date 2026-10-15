@@ -10,7 +10,7 @@ import { useToast } from '../components/Toast'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { EnrollmentBadge } from '../components/Badges'
 import { SearchBox } from '../components/SearchBox'
-import { btnPrimary } from './Auth'
+import { btnPrimary, fieldCls, fieldStyle } from './Auth'
 
 export function CodesQueuePage() {
   const { id = '' } = useParams()
@@ -25,6 +25,12 @@ export function CodesQueuePage() {
   const [confirmBusy, setConfirmBusy] = useState(false)
   const [codeQuery, setCodeQuery] = useState('')
   const [queueQuery, setQueueQuery] = useState('')
+  // Ticket 19: optional teacher knobs for the generate form. Blank means
+  // "server default" — the backend fills CODE_DEFAULT_MAX_USES (50) /
+  // CODE_DEFAULT_EXPIRE_DAYS (7); no endpoint exposes them, so the
+  // placeholders hardcode those values (see str codeGenerateHint).
+  const [maxUses, setMaxUses] = useState('')
+  const [expiresDays, setExpiresDays] = useState('')
 
   const codes = useQuery({
     queryKey: ['codes', id],
@@ -40,7 +46,8 @@ export function CodesQueuePage() {
   })
 
   const generate = useMutation({
-    mutationFn: () => api.post<CodeOut>(`/courses/${id}/codes`, {}),
+    mutationFn: (body: { max_uses?: number; expires_days?: number }) =>
+      api.post<CodeOut>(`/courses/${id}/codes`, body),
     onSuccess: (c) => {
       // Raw code shown ONCE — copy immediately; list shows only prefix.
       setRawCode(c.code)
@@ -48,6 +55,35 @@ export function CodesQueuePage() {
     },
     onError: (e) => toast(e instanceof ApiError ? localizeDetail(e.detail) : 'تعذّر التوليد'),
   })
+
+  // Blank → omit (server default); otherwise ASCII integers within the
+  // backend CodeCreateIn ranges (max_uses 1–1000, expires_days 0–365).
+  // Returns null for blank, undefined for invalid.
+  const parseCount = (raw: string, min: number, max: number): number | null | undefined => {
+    const t = raw.trim()
+    if (!t) return null
+    if (!/^\d+$/.test(t)) return undefined
+    const n = Number(t)
+    if (n < min || n > max) return undefined
+    return n
+  }
+
+  const submitGenerate = () => {
+    const uses = parseCount(maxUses, 1, 1000)
+    if (uses === undefined) {
+      toast(str.codeUsesInvalid)
+      return
+    }
+    const days = parseCount(expiresDays, 0, 365)
+    if (days === undefined) {
+      toast(str.codeDaysInvalid)
+      return
+    }
+    generate.mutate({
+      ...(uses !== null ? { max_uses: uses } : {}),
+      ...(days !== null ? { expires_days: days } : {}),
+    })
+  }
 
   const decide = useMutation({
     mutationFn: ({ eid, action }: { eid: string; action: 'approve' | 'reject' | 'block' | 'unblock' }) =>
@@ -83,7 +119,10 @@ export function CodesQueuePage() {
     }
   }
 
-  const codeList = codes.data?.codes ?? []
+  // Revoked codes stay in history server-side but leave the teacher list —
+  // revoking must visibly remove the row (a dead code that lingers reads as
+  // "the delete button did nothing").
+  const codeList = (codes.data?.codes ?? []).filter((c) => !c.revoked_at)
   const visibleCodes = codeList.filter((c) => matchesArabic(c.code_prefix, codeQuery))
   const pendingList = pending.data?.enrollments ?? []
   const visiblePending = pendingList.filter((e) =>
@@ -125,7 +164,45 @@ export function CodesQueuePage() {
 
       <div className="card arch-sm arch-frame mt-4 p-5">
         <h2 className="font-heading mb-2 font-bold">رموز السلسلة (بحد أقصى 5 نشطة)</h2>
-        <button type="button" onClick={() => generate.mutate()} className={btnPrimary}>
+        <div className="mt-2 flex flex-wrap gap-2">
+          <label className="grid gap-1 text-sm">
+            <span>{str.codeMaxUses}</span>
+            <input
+              value={maxUses}
+              onChange={(e) => setMaxUses(e.target.value)}
+              placeholder="50"
+              type="number"
+              min={1}
+              max={1000}
+              inputMode="numeric"
+              dir="ltr"
+              className={fieldCls}
+              style={{ ...fieldStyle, width: '9rem' }}
+            />
+          </label>
+          <label className="grid gap-1 text-sm">
+            <span>{str.codeExpiryDays}</span>
+            <input
+              value={expiresDays}
+              onChange={(e) => setExpiresDays(e.target.value)}
+              placeholder="7"
+              type="number"
+              min={0}
+              max={365}
+              inputMode="numeric"
+              dir="ltr"
+              className={fieldCls}
+              style={{ ...fieldStyle, width: '9rem' }}
+            />
+          </label>
+        </div>
+        <p className="muted-t mt-1 text-xs">{str.codeGenerateHint}</p>
+        <button
+          type="button"
+          onClick={submitGenerate}
+          disabled={generate.isPending}
+          className={`${btnPrimary} mt-2`}
+        >
           توليد رمز
         </button>
         {codeList.length > 0 && (
@@ -255,7 +332,7 @@ export function CodesQueuePage() {
               ? `سيتوقف الرمز ${confirm.label}… عن العمل فورًا. الطلاب الذين انضموا به لن يتأثروا.`
               : confirm.kind === 'block'
                 ? `سيُحظر «${confirm.name}» من هذه السلسلة ولن يتمكن من العودة برمز جديد.`
-                : `سيسمح لـ «${confirm.name}» بالانضمام مجددًا برمز جديد.`
+                : str.unblockRestores(confirm.name)
           }
           confirmLabel={confirm.kind === 'unblock' ? 'فك الحظر' : 'تأكيد'}
           busy={confirmBusy}

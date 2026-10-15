@@ -52,6 +52,7 @@ export function CoursePage() {
 
   // Numbering = index+1 in the FULL ordered list (backend oldest→newest);
   // search filters client-side but rows keep their full-list number.
+  const [tab, setTab] = useState<'lessons' | 'exams'>('lessons')
   const [lessonQuery, setLessonQuery] = useState('')
   const [examQuery, setExamQuery] = useState('')
   const numberedLessons = (lessons.data ?? []).map((l, i) => ({ lesson: l, n: i + 1 }))
@@ -64,6 +65,15 @@ export function CoursePage() {
   const visibleExams = numberedExams.filter(
     ({ exam: ex }) => !hasAnswerLeak(ex) && matchesArabic(ex.title, examQuery),
   )
+  // Exams linked to a lesson (lesson_id set) surface beside that lesson's
+  // listen button; book-wide exams (null lesson) live only in the exams tab.
+  const examsByLesson = new Map<string, typeof visibleExams>()
+  for (const row of visibleExams) {
+    if (!row.exam.lesson_id) continue
+    const rows = examsByLesson.get(row.exam.lesson_id) ?? []
+    rows.push(row)
+    examsByLesson.set(row.exam.lesson_id, rows)
+  }
 
   return (
     <main className="mx-auto w-full max-w-6xl px-4 pt-28 sm:px-6 lg:px-8">
@@ -77,9 +87,32 @@ export function CoursePage() {
           </Link>
         </div>
       )}
-      <div className="mt-4 grid gap-6 md:grid-cols-2">
-        <section aria-label="الدروس">
-          <h2 className="font-heading mb-2 text-xl font-bold">{str.lessons}</h2>
+      <div className="mt-4" role="tablist" aria-label={`${str.lessons} / ${str.exams}`}>
+        <div className="flex gap-2">
+          {(
+            [
+              { key: 'lessons', label: str.lessons, count: lessons.data?.length ?? 0 },
+              { key: 'exams', label: str.exams, count: visibleExams.length },
+            ] as const
+          ).map((t) => (
+            <button
+              key={t.key}
+              type="button"
+              role="tab"
+              aria-selected={tab === t.key}
+              onClick={() => setTab(t.key)}
+              className={`transition-ui clickable rounded-xl border px-4 py-1.5 font-bold ${
+                tab === t.key ? 'btn-primary' : ''
+              }`}
+              style={tab === t.key ? undefined : { borderColor: 'var(--border)' }}
+            >
+              {t.label} <span dir="ltr">({t.count})</span>
+            </button>
+          ))}
+        </div>
+      </div>
+      {tab === 'lessons' ? (
+        <section aria-label="الدروس" role="tabpanel" className="mt-4">
           {(lessons.data?.length ?? 0) > 0 && (
             <div className="mb-2">
               <SearchBox value={lessonQuery} onChange={setLessonQuery} />
@@ -100,7 +133,7 @@ export function CoursePage() {
           {lessons.data && lessons.data.length > 0 && visibleLessons.length === 0 && (
             <p className="muted-t mt-2 text-center text-sm">{str.noResults}</p>
           )}
-          <ul className="grid gap-4">
+          <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {visibleLessons.map(({ lesson: l, n }) => (
               <li key={l.id} className="card arch arch-frame overflow-hidden">
                 <div className="arch-img m-3 mb-0">
@@ -121,12 +154,23 @@ export function CoursePage() {
                     <LessonBadge status={l.status} />
                   </div>
                   {canView && l.status === 'ready' ? (
-                    <Link
-                      to={`/lessons/${l.id}`}
-                      className="btn-primary transition-ui mt-2 inline-block rounded-xl px-4 py-1.5"
-                    >
-                      استمع
-                    </Link>
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <Link
+                        to={`/lessons/${l.id}`}
+                        className="btn-primary transition-ui inline-block rounded-xl px-4 py-1.5"
+                      >
+                        استمع
+                      </Link>
+                      {(examsByLesson.get(l.id) ?? []).map(({ exam: ex }) => (
+                        <Link
+                          key={ex.id}
+                          to={`/exams/${ex.id}`}
+                          className="btn-secondary transition-ui inline-block rounded-xl px-4 py-1.5"
+                        >
+                          {str.lessonExam}
+                        </Link>
+                      ))}
+                    </div>
                   ) : (
                     <p className="muted-t mt-2 text-sm">
                       {canView ? 'الدرس يُجهّز…' : 'المحتوى للأعضاء المقبولين فقط'}
@@ -137,8 +181,8 @@ export function CoursePage() {
             ))}
           </ul>
         </section>
-        <section aria-label="الاختبارات">
-          <h2 className="font-heading mb-2 text-xl font-bold">{str.exams}</h2>
+      ) : (
+        <section aria-label="الاختبارات" role="tabpanel" className="mt-4">
           {(studentExams.data?.length ?? 0) > 0 && (
             <div className="mb-2">
               <SearchBox value={examQuery} onChange={setExamQuery} />
@@ -186,7 +230,7 @@ export function CoursePage() {
             })}
           </ul>
         </section>
-      </div>
+      )}
       {canView && <CourseFiles courseId={id} />}
     </main>
   )
@@ -239,7 +283,11 @@ function Attachments({ courseId, lessonId }: { courseId: string; lessonId: strin
       {list.data.filter((a) => a.has_file).map((a) => (
         <li key={a.id} className="card flex items-center justify-between gap-2 rounded-xl p-3 text-sm">
           <span>{a.title}</span>
-          <button type="button" onClick={() => openAttachmentFile('lesson', a.id)} className="underline">
+          <button
+            type="button"
+            onClick={() => openAttachmentFile('lesson', a.id)}
+            className="btn-secondary transition-ui shrink-0 rounded-lg px-4 py-1 text-xs font-bold"
+          >
             فتح
           </button>
         </li>
@@ -274,15 +322,18 @@ export function LessonPage() {
           )}
           <h1 className="font-heading mt-1 text-2xl font-bold">{lesson.data.title}</h1>
           {lesson.data.description && <p className="muted-t mt-1 text-sm">{lesson.data.description}</p>}
-          {showPages && (lesson.data.pages_from != null || lesson.data.pages_to != null) && (
-            <p className="muted-t text-sm" dir="ltr">
-              صفحات {lesson.data.pages_from ?? '?'} – {lesson.data.pages_to ?? '?'}
-            </p>
-          )}
-          <div className="mt-1">
+          <div className="mt-2 flex flex-wrap items-center gap-2">
             <LessonBadge status={lesson.data.status} />
+            {showPages && (lesson.data.pages_from != null || lesson.data.pages_to != null) && (
+              <p className="muted-t text-sm" dir="ltr">
+                صفحات {lesson.data.pages_from ?? '?'} – {lesson.data.pages_to ?? '?'}
+              </p>
+            )}
           </div>
-          <div className="card arch arch-frame mt-4 p-5">
+          {/* Title lives in the page h1 above — the cassette shows Side-A only. */}
+          {/* Roomy outer arch (p-8) so the outer frame clearly dominates the
+              smaller inner cassette arch instead of hugging it. */}
+          <div className="card arch mt-4 p-6 sm:p-8">
             {lesson.data.status === 'ready' ? (
               <AudioPlayer
                 fetchUrl={async () => {

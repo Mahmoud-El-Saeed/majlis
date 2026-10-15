@@ -7,8 +7,8 @@ Contract under test:
   codes rejected. Raw code returned once; listing shows prefix hint only.
 - Student Join-with-code -> pending with name/phone/note visible in queue.
 - Approve -> access (courses + lessons gated); reject soft (may re-apply
-  with new code); block per-course ban (cannot rejoin); unblock lifts to
-  rejected.
+  with new code); block per-course ban (cannot rejoin); unblock restores
+  the pre-block status instantly (legacy NULL -> approved).
 - Enrollment checks membership, never role == student; teachers joining
   another teacher's course go through the same gate.
 """
@@ -216,12 +216,91 @@ async def test_block_is_per_course_ban_and_unblock_lifts(client: AsyncClient):
 
     u = await client.post(f"/api/v1/enrollments/{eid}/unblock", headers=th)
     assert u.status_code == 200, u.text
-    assert u.json()["status"] == "rejected"
-    # After unblock the student may re-apply with a fresh code.
-    r3 = await client.post(
-        "/api/v1/enrollments/join", json={"code": c3["code"], "display_name": "S"}, headers=sh
+    assert u.json()["status"] == "pending"
+    # Restored to the pre-block queue spot: still gated, back in the queue,
+    # no re-apply with a new code needed.
+    q = await client.get(f"/api/v1/courses/{cid}/enrollments?status=pending", headers=th)
+    assert q.status_code == 200, q.text
+    assert any(e["id"] == eid for e in q.json()["enrollments"])
+    assert (await client.get(f"/api/v1/courses/{cid}", headers=sh)).status_code == 403
+
+
+async def test_unblock_restores_approved_access_instantly(client: AsyncClient):
+    # Block-approved -> unblock -> approved with instant course access:
+    # no new code, no re-apply, no re-approval.
+    _, th, cid = await _teacher_with_course(client, "ubap04@x.com")
+    made = await _make_code(client, th, cid, {})
+    _, sh = await _student(client, "unblockap04@x.com")
+    j = await client.post(
+        "/api/v1/enrollments/join", json={"code": made["code"], "display_name": "S"}, headers=sh
     )
-    assert r3.status_code == 201, r3.text
+    eid = j.json()["id"]
+    assert (await client.post(f"/api/v1/enrollments/{eid}/approve", headers=th)).status_code == 200
+    assert (await client.get(f"/api/v1/courses/{cid}", headers=sh)).status_code == 200
+
+    assert (await client.post(f"/api/v1/enrollments/{eid}/block", headers=th)).status_code == 200
+    assert (await client.get(f"/api/v1/courses/{cid}", headers=sh)).status_code == 403
+
+    u = await client.post(f"/api/v1/enrollments/{eid}/unblock", headers=th)
+    assert u.status_code == 200, u.text
+    assert u.json()["status"] == "approved"
+    assert (await client.get(f"/api/v1/courses/{cid}", headers=sh)).status_code == 200
+
+
+async def test_unblock_restores_pending_queue_spot(client: AsyncClient):
+    # Block-pending -> unblock -> pending, back in the teacher queue.
+    _, th, cid = await _teacher_with_course(client, "ubpe04@x.com")
+    made = await _make_code(client, th, cid, {})
+    _, sh = await _student(client, "unblockpe04@x.com")
+    j = await client.post(
+        "/api/v1/enrollments/join", json={"code": made["code"], "display_name": "S"}, headers=sh
+    )
+    eid = j.json()["id"]
+
+    assert (await client.post(f"/api/v1/enrollments/{eid}/block", headers=th)).status_code == 200
+    u = await client.post(f"/api/v1/enrollments/{eid}/unblock", headers=th)
+    assert u.status_code == 200, u.text
+    assert u.json()["status"] == "pending"
+    q = await client.get(f"/api/v1/courses/{cid}/enrollments?status=pending", headers=th)
+    assert any(e["id"] == eid for e in q.json()["enrollments"])
+
+
+async def test_unblock_legacy_null_restores_approved(client: AsyncClient):
+    # Rows blocked before status_before_block existed carry NULL and
+    # restore to approved on unblock.
+    import uuid
+
+    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+
+    from app.models.enrollment import Enrollment
+    from tests.conftest import TEST_DATABASE_URL
+
+    _, th, cid = await _teacher_with_course(client, "ublg04@x.com")
+    made = await _make_code(client, th, cid, {})
+    _, sh = await _student(client, "unblocklg04@x.com")
+    j = await client.post(
+        "/api/v1/enrollments/join", json={"code": made["code"], "display_name": "S"}, headers=sh
+    )
+    eid = j.json()["id"]
+    assert (await client.post(f"/api/v1/enrollments/{eid}/approve", headers=th)).status_code == 200
+    assert (await client.post(f"/api/v1/enrollments/{eid}/block", headers=th)).status_code == 200
+
+    # Simulate a legacy row: wipe the column the block just captured.
+    engine = create_async_engine(TEST_DATABASE_URL, future=True)
+    try:
+        session_factory = async_sessionmaker(engine, expire_on_commit=False)
+        async with session_factory() as session:
+            row = await session.get(Enrollment, uuid.UUID(eid))
+            assert row is not None
+            row.status_before_block = None
+            await session.commit()
+    finally:
+        await engine.dispose()
+
+    u = await client.post(f"/api/v1/enrollments/{eid}/unblock", headers=th)
+    assert u.status_code == 200, u.text
+    assert u.json()["status"] == "approved"
+    assert (await client.get(f"/api/v1/courses/{cid}", headers=sh)).status_code == 200
 
 
 async def test_revoked_expired_overused_codes_rejected(client: AsyncClient):
@@ -376,6 +455,12 @@ async def test_same_state_decisions_preserve_audit(client: AsyncClient):
     b1 = await client.post(f"/api/v1/enrollments/{eid}/block", headers=th)
     b2 = await client.post(f"/api/v1/enrollments/{eid}/block", headers=th)
     assert b2.json()["decided_at"] == b1.json()["decided_at"]
+
+    # The idempotent second block must not clobber the captured pre-block
+    # status: unblock still restores approved.
+    u = await client.post(f"/api/v1/enrollments/{eid}/unblock", headers=th)
+    assert u.status_code == 200, u.text
+    assert u.json()["status"] == "approved"
 
 
 async def test_exhausted_code_frees_active_slot(client: AsyncClient):

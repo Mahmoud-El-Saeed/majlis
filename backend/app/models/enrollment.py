@@ -46,6 +46,15 @@ class Enrollment(Base):
         default=EnrollmentStatus.pending,
         server_default="pending",
     )
+    # Pre-block status (same native PG enum, nullable, no default): set on
+    # block, restored on unblock for instant access. NULL = legacy row
+    # blocked before this column existed → unblock restores to approved.
+    status_before_block: Mapped[EnrollmentStatus | None] = mapped_column(
+        SQLEnum(
+            EnrollmentStatus, name="enrollment_status", native_enum=True, validate_strings=True
+        ),
+        nullable=True,
+    )
     display_name: Mapped[str] = mapped_column(String(200))
     phone: Mapped[str | None] = mapped_column(String(50), nullable=True)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)

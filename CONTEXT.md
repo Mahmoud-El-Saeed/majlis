@@ -25,7 +25,7 @@ Single-context repo. Use these terms exactly as defined; do not drift to synonym
 - **Pending:** student entered a valid code and waits for teacher review (sees name/phone/note).
 - **Approved:** teacher accepted; student accesses course content.
 - **Rejected:** soft refusal; student may re-apply with a (new) code.
-- **Blocked:** per-course ban; student cannot rejoin that course. Platform ban is admin-only and separate.
+- **Blocked:** per-course ban; student cannot rejoin that course. The status at block time is kept in `status_before_block`; unblock restores it instantly with no re-apply (rows blocked before the column existed carry NULL and restore to approved). Platform ban is admin-only and separate.
 
 ## Role & enrollment (capability vs trust)
 
