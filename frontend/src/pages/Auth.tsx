@@ -4,6 +4,7 @@ import { ApiError } from '../api/client'
 import { api } from '../api/http'
 import { useAuth } from '../features/auth/AuthContext'
 import { localizeDetail, str } from '../i18n'
+import { ThemeToggle } from '../components/ThemeToggle'
 import { useToast } from '../components/Toast'
 
 export const fieldCls =
@@ -15,7 +16,10 @@ export function AuthCard({ title, children }: { title: string; children: React.R
   return (
     <main className="mx-auto w-full max-w-md px-4 pt-28 sm:px-6">
       <div className="card arabesque rounded-2xl p-6">
-        <h1 className="font-heading mb-1 text-2xl font-bold">{title}</h1>
+        <div className="mb-1 flex items-center justify-between gap-2">
+          <h1 className="font-heading text-2xl font-bold">{title}</h1>
+          <ThemeToggle />
+        </div>
         <div className="gold-rule mb-4" />
         {children}
       </div>
@@ -42,8 +46,16 @@ export function LoginPage() {
   return (
     <AuthCard title={str.login}>
       <form
+        noValidate
         onSubmit={async (e) => {
           e.preventDefault()
+          // Manual Arabic validation: native bubbles render English in
+          // English-locale browsers, so the form opts out (noValidate).
+          if (email.trim() === '' || password === '') {
+            setErr(str.missingFields)
+            setVerifyLink(false)
+            return
+          }
           setErr(null)
           setVerifyLink(false)
           try {
@@ -128,9 +140,13 @@ export function SignupPage() {
   const { toast } = useToast()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [confirm, setConfirm] = useState('')
   const [fullName, setFullName] = useState('')
   const [err, setErr] = useState<string | null>(null)
   const [done, setDone] = useState(false)
+  const match = password === confirm
+  const longEnough = password.length >= 8
+  const canSubmit = email.trim() !== '' && match && longEnough
 
   return (
     <AuthCard title={str.signup}>
@@ -143,8 +159,21 @@ export function SignupPage() {
         </>
       ) : (
         <form
+          noValidate
           onSubmit={async (e) => {
             e.preventDefault()
+            if (email.trim() === '' || password === '' || confirm === '') {
+              setErr(str.missingFields)
+              return
+            }
+            if (!match) {
+              setErr(str.passwordMismatch)
+              return
+            }
+            if (password.length < 8) {
+              setErr(str.passwordMin)
+              return
+            }
             setErr(null)
             try {
               await api.post('/auth/signup', { email, password, full_name: fullName || undefined })
@@ -165,7 +194,7 @@ export function SignupPage() {
             <span className="mb-1 block text-sm">{str.fullName}</span>
             <input value={fullName} onChange={(e) => setFullName(e.target.value)} className={fieldCls} style={fieldStyle} />
           </label>
-          <label className="mb-4 block">
+          <label className="mb-3 block">
             <span className="mb-1 block text-sm">{str.password} (8+ أحرف)</span>
             <input
               type="password"
@@ -173,16 +202,38 @@ export function SignupPage() {
               minLength={8}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              autoComplete="new-password"
               className={fieldCls}
               style={fieldStyle}
             />
           </label>
+          <label className="mb-3 block">
+            <span className="mb-1 block text-sm">{str.confirmPassword}</span>
+            <input
+              type="password"
+              required
+              value={confirm}
+              onChange={(e) => setConfirm(e.target.value)}
+              autoComplete="new-password"
+              aria-invalid={confirm !== '' && !match}
+              className={fieldCls}
+              style={fieldStyle}
+            />
+          </label>
+          <div className="mb-4">
+            <PasswordStrength value={password} />
+          </div>
+          {confirm !== '' && !match && (
+            <p role="alert" className="mb-3 text-sm" style={{ color: 'var(--secondary)' }}>
+              {str.passwordMismatch}
+            </p>
+          )}
           {err && (
             <p role="alert" className="mb-3 text-sm" style={{ color: 'var(--secondary)' }}>
               {err}
             </p>
           )}
-          <button type="submit" className={btnPrimary}>
+          <button type="submit" disabled={!canSubmit} className={btnPrimary}>
             {str.signup}
           </button>
         </form>
@@ -204,6 +255,11 @@ export function VerifyPage() {
   const autoTried = useRef(false)
 
   const submitToken = useCallback(async (t: string) => {
+    if (t.trim() === '') {
+      setState('fail')
+      setMsg(str.missingFields)
+      return
+    }
     try {
       await api.post('/auth/verify', { token: t })
       setState('ok')
@@ -227,6 +283,7 @@ export function VerifyPage() {
         <p className="muted-t mb-3 text-sm">رمز التفعيل المرسل إلى <span dir="ltr">{hintEmail}</span></p>
       )}
       <form
+        noValidate
         onSubmit={async (e) => {
           e.preventDefault()
           await submitToken(token)
@@ -257,6 +314,7 @@ export function VerifyPage() {
 
 export function ResetPage() {
   const [email, setEmail] = useState('')
+  const [emailErr, setEmailErr] = useState<string | null>(null)
   const [sent, setSent] = useState(false)
   const [newPassword, setNewPassword] = useState('')
   const [done, setDone] = useState(false)
@@ -270,8 +328,13 @@ export function ResetPage() {
           <p role="status">تم التحديث — سجّل الدخول.</p>
         ) : (
           <form
+            noValidate
             onSubmit={async (e) => {
               e.preventDefault()
+              if (newPassword.length < 8) {
+                setErr(str.passwordMin)
+                return
+              }
               setErr(null)
               try {
                 await api.post('/auth/password-reset/confirm', { token, new_password: newPassword })
@@ -313,8 +376,15 @@ export function ResetPage() {
         <p role="status">إن كان البريد مسجلًا ستصلك رسالة — تحقق من صندوقك.</p>
       ) : (
         <form
+          noValidate
           onSubmit={async (e) => {
             e.preventDefault()
+            if (email.trim() === '') {
+              setSent(false)
+              setEmailErr(str.missingFields)
+              return
+            }
+            setEmailErr(null)
             await api.post('/auth/password-reset/request', { email })
             setSent(true)
           }}
@@ -323,6 +393,11 @@ export function ResetPage() {
             <span className="mb-1 block text-sm">{str.email}</span>
             <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} className={fieldCls} style={fieldStyle} />
           </label>
+          {emailErr && (
+            <p role="alert" className="mb-3 text-sm" style={{ color: 'var(--secondary)' }}>
+              {emailErr}
+            </p>
+          )}
           <button type="submit" className={btnPrimary}>
             إرسال الرابط
           </button>
@@ -332,18 +407,98 @@ export function ResetPage() {
   )
 }
 
+export function passwordScore(pw: string): number {
+  // Advisory strength (backend enforces min 8): long + mixed case + digit + symbol.
+  let score = 0
+  if (pw.length >= 12) score += 1
+  if (/[a-z]/.test(pw) && /[A-Z]/.test(pw)) score += 1
+  if (/\d/.test(pw)) score += 1
+  if (/[^A-Za-z0-9]/.test(pw)) score += 1
+  return score
+}
+
+export function PasswordStrength({ value }: { value: string }) {
+  const score = passwordScore(value)
+  const label = score <= 1 ? str.pwWeak : score === 2 ? str.pwFair : score === 3 ? str.pwGood : str.pwStrong
+  // Colorful progress: terracotta → gold → sage → turquoise (decorative
+  // segments, never text — readable in both modes by design).
+  const colors = ['#C1543D', '#D99A26', '#7FB069', '#1E847F']
+  return (
+    <div>
+      <div
+        role="meter"
+        aria-label={str.pwStrength}
+        aria-valuemin={0}
+        aria-valuemax={4}
+        aria-valuenow={score}
+        aria-valuetext={label}
+        className="flex gap-1"
+      >
+        {[0, 1, 2, 3].map((i) => (
+          <span
+            key={i}
+            aria-hidden="true"
+            className="h-1.5 flex-1 rounded-full transition-ui"
+            style={{
+              backgroundColor: i < score ? colors[i] : 'var(--border)',
+            }}
+          />
+        ))}
+      </div>
+      <p className="muted-t mt-1 text-xs">
+        {str.pwStrength}: {label} · {str.pwTip}
+      </p>
+    </div>
+  )
+}
+
 export function InviteAcceptPage() {
   const nav = useNavigate()
   const [password, setPassword] = useState('')
+  const [confirm, setConfirm] = useState('')
   const [fullName, setFullName] = useState('')
   const [err, setErr] = useState<string | null>(null)
-  const [token, setToken] = useState(() => new URLSearchParams(window.location.search).get('token') ?? '')
+  // The token lives ONLY in the query parameter — no token field in the form
+  // at all, so password managers never see it and it cannot be mistyped.
+  const [queryToken] = useState(() => new URLSearchParams(window.location.search).get('token') ?? '')
+  const token = queryToken.trim()
+  const match = password === confirm
+  const longEnough = password.length >= 8
+  const canSubmit = token !== '' && match && longEnough
+
+  if (token === '') {
+    return (
+      <AuthCard title="قبول دعوة معلم">
+        <p role="alert" className="mb-3 text-sm" style={{ color: 'var(--secondary)' }}>
+          رابط الدعوة ناقص الرمز — افتح الرابط الكامل من بريد الدعوة.
+        </p>
+        <Link to="/login" className="underline">
+          {str.login}
+        </Link>
+      </AuthCard>
+    )
+  }
 
   return (
     <AuthCard title="قبول دعوة معلم">
       <form
+        noValidate
         onSubmit={async (e) => {
           e.preventDefault()
+          // Name stays optional like the API (full_name || undefined) — only
+          // the token + matching passwords gate the submit.
+          if (password === '' || confirm === '') {
+            setErr(str.missingFields)
+            return
+          }
+          if (!match) {
+            setErr(str.passwordMismatch)
+            return
+          }
+          if (!longEnough) {
+            setErr(str.passwordMin)
+            return
+          }
           setErr(null)
           try {
             await api.post('/invites/accept', { token, password, full_name: fullName || undefined })
@@ -354,14 +509,16 @@ export function InviteAcceptPage() {
         }}
       >
         <label className="mb-3 block">
-          <span className="mb-1 block text-sm">رمز الدعوة</span>
-          <input value={token} onChange={(e) => setToken(e.target.value)} id="invite-token" dir="ltr" className={fieldCls} style={fieldStyle} required />
+          <span className="mb-1 block text-sm">{str.fullName}</span>
+          <input
+            value={fullName}
+            onChange={(e) => setFullName(e.target.value)}
+            autoComplete="name"
+            className={fieldCls}
+            style={fieldStyle}
+          />
         </label>
         <label className="mb-3 block">
-          <span className="mb-1 block text-sm">{str.fullName}</span>
-          <input value={fullName} onChange={(e) => setFullName(e.target.value)} className={fieldCls} style={fieldStyle} />
-        </label>
-        <label className="mb-4 block">
           <span className="mb-1 block text-sm">{str.password} (8+ أحرف)</span>
           <input
             type="password"
@@ -369,16 +526,38 @@ export function InviteAcceptPage() {
             minLength={8}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            autoComplete="new-password"
             className={fieldCls}
             style={fieldStyle}
           />
         </label>
+        <label className="mb-3 block">
+          <span className="mb-1 block text-sm">{str.confirmPassword}</span>
+          <input
+            type="password"
+            required
+            value={confirm}
+            onChange={(e) => setConfirm(e.target.value)}
+            autoComplete="new-password"
+            aria-invalid={confirm !== '' && !match}
+            className={fieldCls}
+            style={fieldStyle}
+          />
+        </label>
+        <div className="mb-4">
+          <PasswordStrength value={password} />
+        </div>
+        {confirm !== '' && !match && (
+          <p role="alert" className="mb-3 text-sm" style={{ color: 'var(--secondary)' }}>
+            {str.passwordMismatch}
+          </p>
+        )}
         {err && (
           <p role="alert" className="mb-3 text-sm" style={{ color: 'var(--secondary)' }}>
             {err}
           </p>
         )}
-        <button type="submit" className={btnPrimary}>
+        <button type="submit" disabled={!canSubmit} className={btnPrimary}>
           قبول وإنشاء الحساب
         </button>
       </form>

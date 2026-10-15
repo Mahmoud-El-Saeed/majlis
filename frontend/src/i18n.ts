@@ -21,6 +21,7 @@ export const str = {
   pendingWait: 'طلبك بانتظار مراجعة الشيخ',
   lessons: 'الدروس',
   exams: 'الاختبارات',
+  lessonExam: 'اختبار الدرس',
   gradebook: 'سجل الدرجات',
   chat: 'المحادثة',
   vault: 'مخزن المفاتيح',
@@ -66,6 +67,64 @@ export const str = {
   resultCount: 'عدد النتائج',
   itemNumber: 'رقم',
   lessonNumber: 'الدرس رقم',
+  // Ticket 17 tactile strings.
+  saveIdle: 'حفظ',
+  saveBusy: 'جارٍ الحفظ…',
+  saveDone: 'تم الحفظ',
+  holdHint: 'اضغط مطولًا للتأكيد',
+  // Ticket 19: the hold button's idle label now names the hold explicitly
+  // (`اضغط مطولًا — {label}`) so a plain click rolling back is unmissable.
+  holdConfirmLabel: (label: string): string => `اضغط مطولًا — ${label}`,
+  holding: 'استمر بالضغط…',
+  holdDone: 'تم التنفيذ',
+  undoAutoClose: 'تُغلق هذه الرسالة تلقائيًا خلال ٥ ثوانٍ',
+  cancel: 'إلغاء',
+  dropHint: 'اسحب الملف هنا أو انقر للاختيار',
+  chosenFile: 'الملف المختار:',
+  pdfFileLabel: 'ملف PDF (أقصى 100MB)',
+  ok: 'حسنًا',
+  createLesson: 'إنشاء الدرس',
+  creatingLesson: 'جارٍ الإنشاء…',
+  // Ticket 18 auth hardening.
+  missingFields: 'يرجى ملء جميع الحقول المطلوبة',
+  passwordMin: 'كلمة المرور 8 أحرف على الأقل',
+  passwordMismatch: 'كلمتا المرور غير متطابقتين',
+  confirmPassword: 'تأكيد كلمة المرور',
+  tokenReadonlyHint: 'رمز الدعوة من الرابط — لا حاجة لتعديله',
+  pwStrength: 'قوة كلمة المرور',
+  pwWeak: 'ضعيفة',
+  pwFair: 'متوسطة',
+  pwGood: 'جيدة',
+  pwStrong: 'قوية',
+  pwTip: 'استخدم 12+ حرفًا مع كبير وصغير وأرقام ورموز',
+  upload: 'رفع',
+  uploadingNow: 'جارٍ الرفع…',
+  uploadDone: 'تم الرفع',
+  addAndUpload: 'إضافة ورفع',
+  // Ticket 19 cassette volume.
+  volume: 'مستوى الصوت',
+  mute: 'كتم الصوت',
+  unmute: 'إلغاء الكتم',
+  formatPages: (from: string, to: string): string => `صفحات ${from} – ${to}`,
+  // Ticket 19 codes repair: generate-form knobs + unblock-restore message.
+  // Server defaults (50 uses / 7 days from CODE_DEFAULT_* in config.py) are
+  // NOT exposed by any endpoint, so the placeholders below hardcode them —
+  // update here if the backend defaults ever change.
+  codeMaxUses: 'الحد الأقصى للاستخدامات',
+  codeExpiryDays: 'مدة الصلاحية (بالأيام)',
+  codeGenerateHint: 'فارغ = الافتراضي (50 استخدامًا، 7 أيام) — 0 أيام يعني منتهيًا فورًا',
+  codeUsesInvalid: 'عدد الاستخدامات: عدد صحيح من 1 إلى 1000',
+  codeDaysInvalid: 'عدد الأيام: عدد صحيح من 0 إلى 365',
+  unblockRestores: (name: string): string =>
+    `سيستعيد «${name}» وصوله السابق فورًا دون الحاجة لرمز جديد.`,
+  // Ticket 19 lesson-manage redesign (LESSON-MANAGE stream): collapsible
+  // info form + audio summary + attachment cards. Values match the
+  // previously hardcoded Arabic so UI text stays byte-identical.
+  expandInfo: 'توسيع بيانات الدرس',
+  collapseInfo: 'طي بيانات الدرس',
+  openFile: 'فتح',
+  replaceFile: 'استبدال',
+  deleteFile: 'حذف',
 } as const
 
 // Backend English detail → Arabic UI message (pass-through fallback keeps English).

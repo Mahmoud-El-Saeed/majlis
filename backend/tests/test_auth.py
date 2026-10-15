@@ -130,3 +130,39 @@ async def test_signup_mail_failure_leaves_no_user_so_retry_works(client, monkeyp
         json={"email": "retry@example.com", "password": "secret1234"},
     )
     assert r.status_code == 201, r.text
+
+
+async def test_update_own_display_name(client):
+    outbox = client._transport.app.state.test_outbox  # type: ignore[union-attr]
+    await client.post(
+        "/api/v1/auth/signup",
+        json={"email": "named@example.com", "password": "secret1234", "full_name": "قديم"},
+    )
+    token = outbox[-1]["body"].split("verify?token=")[1].split()[0].strip()
+    await client.post("/api/v1/auth/verify", json={"token": token})
+    r = await client.post(
+        "/api/v1/auth/login",
+        json={"email": "named@example.com", "password": "secret1234"},
+    )
+    headers = {"Authorization": f"Bearer {r.json()['access_token']}"}
+
+    # Unauthenticated rename is rejected.
+    r = await client.patch("/api/v1/auth/me", json={"full_name": "جديد"})
+    assert r.status_code == 401
+
+    # Blank names are rejected; nothing else on the account may change.
+    r = await client.patch("/api/v1/auth/me", json={"full_name": "  "}, headers=headers)
+    assert r.status_code == 422
+
+    r = await client.patch(
+        "/api/v1/auth/me",
+        json={"full_name": "  جديد  ", "email": "evil@example.com", "role": "admin"},
+        headers=headers,
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["full_name"] == "جديد"
+
+    r = await client.get("/api/v1/auth/me", headers=headers)
+    assert r.json()["full_name"] == "جديد"
+    assert r.json()["email"] == "named@example.com"
+    assert r.json()["role"] == "student"

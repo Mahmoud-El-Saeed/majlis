@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 
 class SignupIn(BaseModel):
@@ -10,6 +10,20 @@ class SignupIn(BaseModel):
 class LoginIn(BaseModel):
     email: EmailStr
     password: str
+
+
+class UpdateMeIn(BaseModel):
+    """Self-service profile edit: display name only (email/role are fixed)."""
+
+    full_name: str = Field(min_length=1, max_length=200)
+
+    @field_validator("full_name")
+    @classmethod
+    def _strip_non_blank(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("Name must not be blank.")
+        return v
 
 
 class TokenOut(BaseModel):

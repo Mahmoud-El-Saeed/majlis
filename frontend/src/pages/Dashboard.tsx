@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ApiError } from '../api/client'
 import { api } from '../api/http'
+import { useAuth } from '../features/auth/AuthContext'
 import type { DashboardOut } from '../api/types'
 import { canViewContent } from '../features/enrollment/gates'
 import { dashboardBadge } from '../features/enrollment/gates'
@@ -20,9 +21,14 @@ import { btnPrimary, fieldCls, fieldStyle } from './Auth'
 
 export function JoinBox({ onJoined }: { onJoined: () => void }) {
   const { toast } = useToast()
+  const { user } = useAuth()
   const [code, setCode] = useState('')
   const [displayName, setDisplayName] = useState('')
   const [err, setErr] = useState<string | null>(null)
+  // The account already carries the display name (set at signup, editable in
+  // /account) — ask for it only when the account has none yet.
+  const accountName = user?.full_name?.trim() || ''
+  const effectiveName = accountName || displayName.trim()
 
   const join = useMutation({
     mutationFn: (body: { code: string; display_name: string }) =>
@@ -42,33 +48,47 @@ export function JoinBox({ onJoined }: { onJoined: () => void }) {
 
   return (
     <form
+      noValidate
       onSubmit={(e) => {
         e.preventDefault()
-        join.mutate({ code: code.trim(), display_name: displayName.trim() })
+        if (code.trim() === '' || effectiveName === '') {
+          setErr(str.missingFields)
+          return
+        }
+        setErr(null)
+        join.mutate({ code: code.trim(), display_name: effectiveName })
       }}
     >
-        <label className="mb-2 block">
-          <span className="mb-1 block text-sm">الرمز</span>
-          <input
-            value={code}
-            onChange={(e) => setCode(e.target.value)}
-            dir="ltr"
-            required
-            placeholder="XXXXXXXX"
-            className={fieldCls}
-            style={fieldStyle}
-          />
-        </label>
+      <label className="mb-2 block">
+        <span className="mb-1 block text-sm">الرمز</span>
+        <input
+          value={code}
+          onChange={(e) => setCode(e.target.value)}
+          dir="ltr"
+          placeholder="XXXXXXXX"
+          className={fieldCls}
+          style={fieldStyle}
+        />
+      </label>
+      {accountName === '' ? (
         <label className="mb-3 block">
           <span className="mb-1 block text-sm">الاسم المعروض للشيخ</span>
           <input
             value={displayName}
             onChange={(e) => setDisplayName(e.target.value)}
-            required
             className={fieldCls}
             style={fieldStyle}
           />
         </label>
+      ) : (
+        <p className="muted-t mb-3 text-sm">
+          ستنضم باسم: <span className="font-bold" dir="auto">{accountName}</span> (غيّره من{' '}
+          <Link to="/account" className="underline">
+            حسابي
+          </Link>
+          )
+        </p>
+      )}
         {err && (
           <p role="alert" className="mb-2 text-sm" style={{ color: 'var(--secondary)' }}>
             {err}

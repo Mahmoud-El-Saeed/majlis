@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { localizeDetail } from './i18n'
+import { localizeDetail, str } from './i18n'
 
 describe('i18n detail mapping', () => {
   it('maps 429 to Arabic', () => {
@@ -27,5 +27,34 @@ describe('i18n detail mapping', () => {
       /100MB/,
     )
     expect(localizeDetail('Only book-based courses have a main book.')).toMatch(/الأساسي/)
+  })
+  it('centralizes ticket-17 tactile strings (no component-local Arabic)', () => {
+    expect(str.saveIdle).toBe('حفظ')
+    expect(str.saveBusy).toMatch(/جارٍ الحفظ/)
+    expect(str.saveDone).toMatch(/تم الحفظ/)
+    expect(str.holdHint).toMatch(/مطولًا/)
+    expect(str.holding).toMatch(/استمر/)
+    expect(str.holdDone).toBeTruthy()
+    expect(str.undoAutoClose).toBeTruthy()
+    expect(str.ok).toBe('حسنًا')
+    expect(str.cancel).toBe('إلغاء')
+    expect(str.dropHint).toMatch(/اسحب/)
+    expect(str.chosenFile).toMatch(/المختار/)
+    expect(str.pdfFileLabel).toMatch(/100MB/)
+  })
+  it('centralizes ticket-18 auth + upload strings', () => {
+    expect(str.missingFields).toBeTruthy()
+    expect(str.passwordMin).toMatch(/8/)
+    expect(str.passwordMismatch).toMatch(/متطابقتين/)
+    expect(str.confirmPassword).toBeTruthy()
+    expect(str.tokenReadonlyHint).toMatch(/الرابط/)
+    expect(str.pwStrength).toBeTruthy()
+    expect(str.pwWeak).toBeTruthy()
+    expect(str.pwStrong).toBeTruthy()
+    expect(str.createLesson).toBe('إنشاء الدرس')
+    expect(str.upload).toBe('رفع')
+    expect(str.uploadDone).toMatch(/تم الرفع/)
+    expect(str.addAndUpload).toBe('إضافة ورفع')
+    expect(str.formatPages('٤٥', '٦٢')).toMatch(/صفحات/)
   })
 })

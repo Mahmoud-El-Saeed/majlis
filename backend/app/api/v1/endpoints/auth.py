@@ -14,6 +14,7 @@ from app.schemas.auth import (
     SignupIn,
     SignupOut,
     TokenOut,
+    UpdateMeIn,
     UserOut,
     VerifyIn,
 )
@@ -100,6 +101,12 @@ async def refresh(db: DbDep, data: RefreshIn) -> TokenOut:
 @router.get("/me", response_model=UserOut)
 async def me(user: CurrentUserDep) -> UserOut:
     return to_user_out(user)
+
+
+@router.patch("/me", response_model=UserOut)
+async def update_me(db: DbDep, user: CurrentUserDep, data: UpdateMeIn) -> UserOut:
+    updated = await auth_service.update_display_name(db, user, data.full_name)
+    return to_user_out(updated)
 
 
 @router.post("/password-reset/request", response_model=MessageOut)

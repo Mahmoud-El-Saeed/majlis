@@ -1,13 +1,16 @@
 import { useState } from 'react'
-import { Link, NavLink, useNavigate } from 'react-router-dom'
+import { Link, NavLink } from 'react-router-dom'
 import { useAuth } from '../features/auth/AuthContext'
+import { useLang } from '../features/lang/lang'
+import { accountNavLabel } from '../pages/Account'
 import { str } from '../i18n'
-import { ThemeToggle } from './ThemeToggle'
 import logoStar from '../assets/logo-star.svg'
 
 export function Navbar() {
-  const { user, logout, isTeacher, isAdmin } = useAuth()
-  const nav = useNavigate()
+  // Theme + logout live in the account page (and theme also on landing +
+  // auth cards) — the navbar keeps navigation only.
+  const { user, isTeacher, isAdmin } = useAuth()
+  const { lang } = useLang()
   const [menuOpen, setMenuOpen] = useState(false)
 
   const linkCls = ({ isActive }: { isActive: boolean }) =>
@@ -56,18 +59,13 @@ export function Navbar() {
                 {str.myCourses}
               </NavLink>
               <span className="hidden sm:contents">{secondaryLinks}</span>
-              <span className="muted-t hidden sm:inline">{user.email}</span>
-              <button
-                type="button"
-                className="transition-ui clickable hidden rounded-lg border px-3 py-1 sm:block"
-                style={{ borderColor: 'var(--border)' }}
-                onClick={() => {
-                  logout()
-                  nav('/login')
-                }}
+              <NavLink
+                to="/account"
+                className={linkCls}
+                style={({ isActive }) => (isActive ? { borderBottom: '2px solid var(--gold)' } : undefined)}
               >
-                {str.logout}
-              </button>
+                {accountNavLabel(lang)}
+              </NavLink>
               <span className="sm:hidden">
                 <button
                   type="button"
@@ -95,7 +93,6 @@ export function Navbar() {
               </Link>
             </>
           )}
-          <ThemeToggle />
         </nav>
       </div>
       {user && menuOpen && (
@@ -103,18 +100,9 @@ export function Navbar() {
           <span onClick={() => setMenuOpen(false)} className="contents">
             {secondaryLinks}
           </span>
-          <button
-            type="button"
-            className="transition-ui clickable rounded-lg border px-3 py-1 text-start"
-            style={{ borderColor: 'var(--border)' }}
-            onClick={() => {
-              setMenuOpen(false)
-              logout()
-              nav('/login')
-            }}
-          >
-            {str.logout}
-          </button>
+          <NavLink to="/account" className={linkCls} onClick={() => setMenuOpen(false)}>
+            {accountNavLabel(lang)}
+          </NavLink>
         </div>
       )}
     </header>

@@ -4,6 +4,7 @@ import { RequireAdmin, RequireAuth, RequireWriter } from './components/Guards'
 import { HomePage, NotFoundPage, Footer } from './pages/Home'
 import { InviteAcceptPage, LoginPage, ResetPage, SignupPage, VerifyPage } from './pages/Auth'
 import { DashboardPage } from './pages/Dashboard'
+import { AccountPage } from './pages/Account'
 import { CoursePage, LessonPage } from './pages/Course'
 import { ExamTakePage, MyAttemptsPage } from './pages/ExamTake'
 import { TeachDashboard } from './pages/Teach'
@@ -26,6 +27,7 @@ export default function App() {
         <Route path="/invite" element={<InviteAcceptPage />} />
 
         <Route path="/dashboard" element={<RequireAuth><DashboardPage /></RequireAuth>} />
+        <Route path="/account" element={<RequireAuth><AccountPage /></RequireAuth>} />
         <Route path="/courses/:id" element={<RequireAuth><CoursePage /></RequireAuth>} />
         <Route path="/courses/:id/chat" element={<RequireAuth><ChatStubPage /></RequireAuth>} />
         <Route path="/lessons/:id" element={<RequireAuth><LessonPage /></RequireAuth>} />

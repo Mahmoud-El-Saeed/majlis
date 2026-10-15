@@ -123,3 +123,10 @@ async def confirm_password_reset(db: AsyncSession, token: str, new_password: str
         raise AuthError("Invalid or expired reset link.")
     user.hashed_password = get_password_hash(new_password)
     await db.flush()
+
+
+async def update_display_name(db: AsyncSession, user: User, full_name: str) -> User:
+    """Self-service rename: display name only. Email/role never change here."""
+    user.full_name = full_name
+    await db.flush()
+    return user

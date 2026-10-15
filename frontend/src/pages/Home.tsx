@@ -2,6 +2,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../features/auth/AuthContext'
 import { str } from '../i18n'
 import { StarDivider, Star8 } from '../components/Star8'
+import { ThemeToggle } from '../components/ThemeToggle'
 import heroArch from '../assets/hero-arch.svg'
 
 export function HomePage() {
@@ -19,7 +20,7 @@ export function HomePage() {
             <p className="muted-t mt-3">
               حلقة مسجد خاصة: تسجيلات + نصوص + مرفقات + اختبارات + سؤال من الدروس — بالعربية أولًا.
             </p>
-            <div className="mt-5 flex gap-2">
+            <div className="mt-5 flex flex-wrap items-center gap-2">
               <Link to="/signup" className="btn-primary transition-ui rounded-xl px-6 py-2 font-bold">
                 {str.signup}
               </Link>
@@ -30,6 +31,7 @@ export function HomePage() {
               >
                 {str.login}
               </Link>
+              <ThemeToggle />
             </div>
           </div>
           <div className="arch arch-frame card hidden p-4 md:block">

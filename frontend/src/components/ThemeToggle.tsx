@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { str } from '../i18n'
 
-export function ThemeToggle() {
+export function ThemeToggle({ labels }: { labels?: { dark: string; light: string } } = {}) {
   // The pre-paint script in index.html already applied the stored/OS theme
   // to <html>, so the toggle just mirrors the DOM and persists on change —
   // no load effect (the old load-vs-save race reset the theme on refresh).
@@ -25,7 +25,7 @@ export function ThemeToggle() {
       aria-pressed={dark}
       aria-label="تبديل المظهر"
     >
-      {dark ? str.day : str.night}
+      {dark ? (labels?.light ?? str.day) : (labels?.dark ?? str.night)}
     </button>
   )
 }
