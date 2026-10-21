@@ -7,6 +7,8 @@ export type LessonStatus = 'processing' | 'ready' | 'failed'
 export type ShowResultMode = 'immediate' | 'after_publish'
 export type QuestionType = 'mcq' | 'tf' | 'essay'
 export type WindowStatus = 'open' | 'upcoming' | 'closed'
+// Ticket 20: the attempt lifecycle is a closed vocabulary, not free text.
+export type AttemptStatus = 'in_progress' | 'submitted'
 
 export type TokenOut = { access_token: string; refresh_token: string; token_type: string }
 export type UserOut = {
@@ -123,6 +125,13 @@ export type StudentExamOut = ExamOut & {
   last_score?: number | null
 }
 
+// Ticket 20: the student-safe read of ONE exam (GET /exams/{id}/student-exam).
+// Same projection as the list endpoint plus the question count — never the
+// questions themselves, never an answer key.
+export type StudentExamDetailOut = StudentExamOut & {
+  questions_count: number
+}
+
 export type QuestionOut = {
   id: string
   exam_id: string
@@ -163,7 +172,7 @@ export type AttemptOut = {
   exam_id: string
   course_id: string
   student_id: string
-  status: string
+  status: AttemptStatus
   started_at: string
   expires_at?: string | null
   submitted_at?: string | null

@@ -223,7 +223,7 @@ export function CoursePage() {
                     to={`/exams/${ex.id}`}
                     className="btn-primary transition-ui mt-2 inline-block rounded-xl px-4 py-1.5"
                   >
-                    دخول الاختبار
+                    {ex.has_in_progress ? str.resumeExam : str.enterExam}
                   </Link>
                 </li>
               )

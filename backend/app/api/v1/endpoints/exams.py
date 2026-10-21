@@ -11,10 +11,12 @@ from app.schemas.exams import (
     QuestionCreateIn,
     QuestionOut,
     QuestionUpdateIn,
+    StudentExamDetailOut,
     StudentExamOut,
     to_exam_detail_out,
     to_exam_out,
     to_question_out,
+    to_student_exam_detail_out,
     to_student_exam_out,
 )
 from app.services import exam_service
@@ -70,9 +72,13 @@ async def list_student_exams(
     now = datetime.now(UTC)
     return [
         to_student_exam_out(
-            exam, attempts_used=used, has_in_progress=active, last_score=score, now=now
+            exam,
+            attempts_used=progress.attempts_used,
+            has_in_progress=progress.has_in_progress,
+            last_score=progress.last_score,
+            now=now,
         )
-        for exam, used, active, score in rows
+        for exam, progress in rows
     ]
 
 
@@ -83,6 +89,32 @@ async def get_exam(db: DbDep, actor: CurrentUserDep, exam_id: str) -> ExamDetail
     except _EXAM_ERRORS as e:
         raise HTTPException(status_code=_error_status(e), detail=e.message) from None
     return to_exam_detail_out(exam, questions)
+
+
+@router.get("/exams/{exam_id}/student-exam", response_model=StudentExamDetailOut)
+async def get_student_exam(
+    db: DbDep, actor: CurrentUserDep, exam_id: str
+) -> StudentExamDetailOut:
+    """Student-safe single exam read (ticket 20).
+
+    Same can_view gate as the per-course discovery list: approved
+    enrollment, owner-teacher, or admin. The payload carries the exam
+    config, the personal progress numbers and the question COUNT only —
+    never a question body, an option list or an answer key.
+    """
+    try:
+        exam, count, progress = await exam_service.get_student_exam_detail(db, actor, exam_id)
+    except _EXAM_ERRORS as e:
+        raise HTTPException(status_code=_error_status(e), detail=e.message) from None
+    now = datetime.now(UTC)
+    return to_student_exam_detail_out(
+        exam,
+        questions_count=count,
+        attempts_used=progress.attempts_used,
+        has_in_progress=progress.has_in_progress,
+        last_score=progress.last_score,
+        now=now,
+    )
 
 
 @router.put("/exams/{exam_id}", response_model=ExamOut)

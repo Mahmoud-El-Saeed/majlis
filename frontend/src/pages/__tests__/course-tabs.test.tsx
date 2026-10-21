@@ -55,7 +55,7 @@ function stubCourse() {
               attempts_used: 0,
               attempts_left: 1,
               window_status: 'open',
-              has_in_progress: false,
+              has_in_progress: true,
               last_score: null,
             },
           ]),
@@ -119,6 +119,23 @@ describe('course lessons/exams tabs', () => {
     expect(within(card).getByRole('link', { name: 'استمع' })).toHaveAttribute(
       'href',
       '/lessons/L1',
+    )
+  })
+
+  it('an exam with a live attempt offers to resume it', async () => {
+    stubCourse()
+    renderCourse()
+    fireEvent.click(await screen.findByRole('tab', { name: /الاختبارات/ }))
+
+    const live = (await screen.findByText('اختبار عام')).closest('li')!
+    expect(within(live).getByRole('link', { name: 'متابعة الاختبار' })).toHaveAttribute(
+      'href',
+      '/exams/E2',
+    )
+    const idle = screen.getByText('اختبار الدرس').closest('li')!
+    expect(within(idle).getByRole('link', { name: 'دخول الاختبار' })).toHaveAttribute(
+      'href',
+      '/exams/E1',
     )
   })
 })

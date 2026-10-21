@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.question import Question
@@ -22,6 +22,14 @@ class QuestionRepository:
             .order_by(Question.position.asc(), Question.created_at.asc())
         )
         return list(result.scalars().all())
+
+    async def count_for_exam(self, db: AsyncSession, exam_id: uuid.UUID) -> int:
+        """How many questions an exam holds — the student-safe projection
+        exposes the count only, never the questions."""
+        result = await db.execute(
+            select(func.count()).select_from(Question).where(Question.exam_id == exam_id)
+        )
+        return int(result.scalar_one())
 
     async def save(self, db: AsyncSession, question: Question) -> Question:
         db.add(question)

@@ -78,8 +78,10 @@ class AttemptAnswer(Base):
     __tablename__ = "attempt_answers"
     __table_args__ = (
         UniqueConstraint("attempt_id", "question_id", name="uq_attempt_answers_attempt_question"),
+        # Upper bound intentionally open: MCQ questions carry 2+ options (the
+        # frontend allows up to 10), so a selection may sit above index 3.
         CheckConstraint(
-            "selected_index IS NULL OR (selected_index >= 0 AND selected_index <= 3)",
+            "selected_index IS NULL OR selected_index >= 0",
             name="ck_attempt_answers_selected_index",
         ),
         CheckConstraint("awarded_score >= 0", name="ck_attempt_answers_awarded"),

@@ -1,4 +1,12 @@
-import type { QuestionType, ShowResultMode, WindowStatus } from '../../api/types'
+import type {
+  AttemptAnswerOut,
+  AttemptOut,
+  AttemptStatus,
+  QuestionType,
+  ShowResultMode,
+  WindowStatus,
+} from '../../api/types'
+import { str } from '../../i18n'
 
 // Student payload must never carry answer keys (server enforces; UI double-checks).
 export function hasAnswerLeak(payload: unknown): boolean {
@@ -122,4 +130,69 @@ export function toLocalInput(iso?: string | null): string {
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return ''
   return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`
+}
+
+// ---------------------------------------------------------------------------
+// Ticket 20: taking an exam (recovery, autosave, history labels).
+// Pure helpers only — no fetching, no clocks beyond the ones passed in.
+// ---------------------------------------------------------------------------
+
+// Arabic month names, Latin digits (the app shows Latin numbers everywhere).
+const AR_DATE_TIME = new Intl.DateTimeFormat('ar-EG-u-nu-latn', {
+  day: 'numeric',
+  month: 'long',
+  year: 'numeric',
+  hour: 'numeric',
+  minute: '2-digit',
+})
+
+/** Localized Arabic date+time; '' for missing or unparsable input. */
+export function formatArabicDateTime(iso?: string | null): string {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  return AR_DATE_TIME.format(d)
+}
+
+/** Arabic label for an attempt's lifecycle state. */
+export function attemptStatusLabel(status: AttemptStatus): string {
+  return status === 'in_progress' ? str.inProgress : str.submitted
+}
+
+/** A resumable attempt: still in progress AND its timer has not run out.
+ *
+ * The server settles expired attempts on the next read, but a cached list or
+ * a page left open past the timer must not offer "continue" for one.
+ */
+export function canResumeAttempt(
+  attempt: Pick<AttemptOut, 'status' | 'expires_at'>,
+  now: number = Date.now(),
+): boolean {
+  if (attempt.status !== 'in_progress') return false
+  if (!attempt.expires_at) return true
+  return new Date(attempt.expires_at).getTime() > now
+}
+
+export type AttemptResultInput = {
+  status: AttemptStatus
+  score?: number | null
+  max_score: number
+  answers: Pick<AttemptAnswerOut, 'needs_grading'>[]
+}
+
+/**
+ * The outcome line of a submitted attempt, or null while it is still live.
+ * The score is only set by the server when the exam's publish rules allow
+ * showing it, so a missing score means the result is NOT published yet — and
+ * that is the reason the student sees, whatever the essay state is. A visible
+ * score with a pending essay is the "graded but not finished" case.
+ */
+export function attemptResultLabel(attempt: AttemptResultInput): string | null {
+  if (attempt.status === 'in_progress') return null
+  const pendingGrading = attempt.answers.some((a) => a.needs_grading)
+  if (attempt.score !== null && attempt.score !== undefined) {
+    const score = str.examScore(attempt.score, attempt.max_score)
+    return pendingGrading ? `${score} — ${str.awaitingGrading}` : score
+  }
+  return str.awaitingPublish
 }

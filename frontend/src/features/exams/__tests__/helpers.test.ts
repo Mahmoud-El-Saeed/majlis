@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import {
+  attemptResultLabel,
+  attemptStatusLabel,
   blankDraft,
+  canResumeAttempt,
   draftToBody,
+  formatArabicDateTime,
   hasAnswerLeak,
   isScoreVisible,
   normalizeOptions,
@@ -104,5 +108,81 @@ describe('authoring helpers (Google-Forms-style)', () => {
     expect(toLocalInput(null)).toBe('')
     expect(toLocalInput('bad')).toBe('')
     expect(toLocalInput('2026-10-01T12:30:00Z')).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/)
+  })
+})
+
+// Seam: taking an exam (ticket 20) — Arabic labels, localized dates,
+// resume rules and the "a second attempt exists" signal.
+describe('attempt helpers (ticket 20)', () => {
+  it('formats dates in Arabic with Latin digits', () => {
+    const out = formatArabicDateTime('2026-10-20T12:00:00Z')
+    expect(out).toContain('أكتوبر')
+    expect(out).toMatch(/2026/)
+    // Latin digits, never Arabic-Indic ones.
+    expect(out).not.toMatch(/[٠-٩]/)
+  })
+
+  it('returns an empty string for missing or broken dates', () => {
+    expect(formatArabicDateTime(null)).toBe('')
+    expect(formatArabicDateTime(undefined)).toBe('')
+    expect(formatArabicDateTime('not-a-date')).toBe('')
+  })
+
+  it('labels attempt statuses in Arabic', () => {
+    expect(attemptStatusLabel('in_progress')).toBe('قيد الأداء')
+    expect(attemptStatusLabel('submitted')).toBe('تم التسليم')
+  })
+
+  it('resumes only live, unexpired attempts', () => {
+    expect(canResumeAttempt({ status: 'in_progress', expires_at: null })).toBe(true)
+    expect(canResumeAttempt({ status: 'submitted', expires_at: null })).toBe(false)
+
+    const soon = new Date(Date.now() + 60_000).toISOString()
+    const past = new Date(Date.now() - 60_000).toISOString()
+    expect(canResumeAttempt({ status: 'in_progress', expires_at: soon })).toBe(true)
+    // A stale page/cache must not offer "continue" past the timer.
+    expect(canResumeAttempt({ status: 'in_progress', expires_at: past })).toBe(false)
+  })
+
+  it('has no result line while the attempt is live', () => {
+    expect(
+      attemptResultLabel({ status: 'in_progress', score: null, max_score: 10, answers: [] }),
+    ).toBeNull()
+  })
+
+  it('shows the score once it is visible', () => {
+    expect(
+      attemptResultLabel({ status: 'submitted', score: 8, max_score: 10, answers: [] }),
+    ).toBe('الدرجة 8 / 10')
+  })
+
+  it('marks an ungraded answer as awaiting grading', () => {
+    expect(
+      attemptResultLabel({
+        status: 'submitted',
+        score: 5,
+        max_score: 10,
+        answers: [{ needs_grading: true }],
+      }),
+    ).toBe('الدرجة 5 / 10 — بانتظار التصحيح')
+  })
+
+  it('falls back to awaiting publication when the result is hidden', () => {
+    expect(
+      attemptResultLabel({ status: 'submitted', score: null, max_score: 10, answers: [] }),
+    ).toBe('بانتظار النشر')
+  })
+
+  it('keeps an unpublished result unpublished even with a pending essay', () => {
+    // The server hides the score until the teacher publishes; that is the
+    // reason the student sees, whatever the essay state is.
+    expect(
+      attemptResultLabel({
+        status: 'submitted',
+        score: null,
+        max_score: 10,
+        answers: [{ needs_grading: true }],
+      }),
+    ).toBe('بانتظار النشر')
   })
 })

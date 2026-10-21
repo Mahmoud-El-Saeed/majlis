@@ -1,4 +1,6 @@
 import uuid
+from dataclasses import dataclass
+from datetime import UTC, datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -88,36 +90,77 @@ async def list_exams(db: AsyncSession, actor: User, course_id: str) -> list[Exam
     return await exam_repository.list_for_course(db, course.id)
 
 
+@dataclass(frozen=True)
+class StudentProgress:
+    """One viewer's personal numbers on one exam."""
+
+    attempts_used: int
+    has_in_progress: bool
+    last_score: int | None
+
+
+async def _student_progress(db: AsyncSession, actor: User, exam: Exam) -> StudentProgress:
+    """Personal progress of one viewer on one exam.
+
+    Single source of truth for the student-safe projections (per-course list
+    and the single exam read) so the two cannot drift. Settles attempts the
+    clock already closed first: an expired attempt is submitted-at-0, never
+    an endless "in progress" the student could resume.
+
+    No role check here (capability rule): every viewer gets their own real
+    rows. Writers naturally read zeros — start-attempt is student-strict, so
+    they can never hold attempts.
+    """
+    from app.models.attempt import AttemptStatus
+    from app.services.attempt_service import finalize_expired_attempts, show_grades_for
+
+    now = datetime.now(UTC)
+    await finalize_expired_attempts(db, exam, actor.id, now)
+    rows = await attempt_repository.list_for_exam_student(db, exam.id, actor.id)
+    submitted = [a for a in rows if a.status == AttemptStatus.submitted]
+    active = any(a.status == AttemptStatus.in_progress for a in rows)
+    latest = submitted[-1] if submitted else None
+    visible_score = (
+        latest.score if latest is not None and show_grades_for(exam, latest) else None
+    )
+    return StudentProgress(len(rows), active, visible_score)
+
+
 async def list_student_exams(
     db: AsyncSession, actor: User, course_id: str
-) -> list[tuple[Exam, int, bool, int | None]]:
+) -> list[tuple[Exam, StudentProgress]]:
     """Student-safe per-course list (ticket 14).
 
     Gate is can_view: approved enrollment, owner-teacher, or admin.
     Pending/blocked/outsider get ExamForbidden (403); anon 401 upstream.
     Writers keep the existing can_write preview path untouched.
     """
-    from app.models.attempt import AttemptStatus
-    from app.services.attempt_service import show_grades_for
-
     course = await _course_or_404(db, course_id)
     if not await can_view(db, actor, course):
         raise ExamForbidden("Not authorized.")
     exams = await exam_repository.list_for_course(db, course.id)
-    out: list[tuple[Exam, int, bool, int | None]] = []
-    for exam in exams:
-        # No role check here (capability rule): every viewer gets their own
-        # real rows. Writers naturally read zeros — start-attempt is
-        # student-strict, so they can never hold attempts.
-        rows = await attempt_repository.list_for_exam_student(db, exam.id, actor.id)
-        submitted = [a for a in rows if a.status == AttemptStatus.submitted]
-        active = any(a.status == AttemptStatus.in_progress for a in rows)
-        latest = submitted[-1] if submitted else None
-        visible_score = (
-            latest.score if latest is not None and show_grades_for(exam, latest) else None
-        )
-        out.append((exam, len(rows), active, visible_score))
-    return out
+    return [(exam, await _student_progress(db, actor, exam)) for exam in exams]
+
+
+async def get_student_exam_detail(
+    db: AsyncSession, actor: User, exam_id: str
+) -> tuple[Exam, int, StudentProgress]:
+    """Student-safe single exam read (ticket 20).
+
+    Same can_view gate as the per-course list: approved enrollment,
+    owner-teacher, or admin. Pending/blocked/outsider get ExamForbidden
+    (403); anon 401 upstream; unknown exam/course 404.
+
+    Returns the exam, its question COUNT and the viewer's progress. Only the
+    count leaves this seam — the questions themselves and every answer key
+    stay out of the payload.
+    """
+    exam, course = await _exam_and_course(db, exam_id)
+    if not await can_view(db, actor, course):
+        raise ExamForbidden("Not authorized.")
+    questions_count = await question_repository.count_for_exam(db, exam.id)
+    progress = await _student_progress(db, actor, exam)
+    return exam, questions_count, progress
 
 
 async def _exam_and_course(db: AsyncSession, exam_id: str):  # type: ignore[no-untyped-def]

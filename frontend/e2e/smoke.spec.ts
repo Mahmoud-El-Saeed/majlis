@@ -207,6 +207,29 @@ test('live: signup → join → approve → listen → exam → grade', async ({
     expires_at: string | null
   }
   expect(attempt.expires_at).toBeTruthy()
+
+  // Autosave round-trip against the real API: the draft is persisted server
+  // side and a fresh read reopens the SAME attempt with the same selection —
+  // a reload can never consume an attempt.
+  const draft = await request.post(`${apiBase}/attempts/${attempt.id}/answers`, {
+    headers: sHeaders,
+    data: { answers: [{ question_id: attempt.questions[0].id, selected_index: 1 }] },
+  })
+  expect(draft.ok()).toBeTruthy()
+  const reopened = await request.get(`${apiBase}/exams/${examId}/attempts/me`, {
+    headers: sHeaders,
+  })
+  expect(reopened.ok()).toBeTruthy()
+  const attempts = (await reopened.json()) as Array<{
+    id: string
+    status: string
+    answers: Array<{ question_id: string; selected_index: number | null }>
+  }>
+  expect(attempts).toHaveLength(1)
+  expect(attempts[0].id).toBe(attempt.id)
+  expect(attempts[0].status).toBe('in_progress')
+  expect(attempts[0].answers[0]?.selected_index).toBe(1)
+
   const submit = await request.post(`${apiBase}/attempts/${attempt.id}/submit`, {
     headers: sHeaders,
     data: { answers: [{ question_id: attempt.questions[0].id, selected_index: 1 }] },

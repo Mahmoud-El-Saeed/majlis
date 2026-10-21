@@ -125,6 +125,50 @@ export const str = {
   openFile: 'فتح',
   replaceFile: 'استبدال',
   deleteFile: 'حذف',
+  // Ticket 20: the exam-taking flow (intro card, recovery, history). Shared
+  // by the course exam card, the exam page and the attempts history page.
+  resumeExam: 'متابعة الاختبار',
+  enterExam: 'دخول الاختبار',
+  myAttempts: 'محاولاتي',
+  inProgress: 'قيد الأداء',
+  submitted: 'تم التسليم',
+  awaitingGrading: 'بانتظار التصحيح',
+  awaitingPublish: 'بانتظار النشر',
+  noAttempts: 'لا توجد محاولات بعد',
+  backToCourse: 'عودة إلى السلسلة',
+  examNotFound: 'الاختبار غير موجود',
+  examNotEnrolled: 'لست مقيدًا في هذه السلسلة',
+  examNoDescription: 'لا يوجد وصف لهذا الاختبار',
+  loadingExam: 'جار تحميل الاختبار',
+  resume: 'متابعة',
+  attemptsExhausted: 'نفدت محاولاتك',
+  startAttempt: 'بدء المحاولة',
+  // Ticket 20: the states around the exam card.
+  examLoadFailed: 'تعذّر تحميل الاختبار',
+  examWriterOnly: 'بدء المحاولة للطلاب فقط — المعلم يستخدم المعاينة',
+  examNotOpenYet: 'لم يبدأ الاختبار بعد',
+  examWindowClosed: 'انتهى وقت الاختبار',
+  examStartFailed: 'تعذّر بدء المحاولة',
+  examSubmitFailed: 'تعذّر التسليم',
+  examAttemptsFailed: 'تعذّر تحميل المحاولات',
+  examAutosaveFailed: 'تعذّر الحفظ التلقائي — ستُحفظ إجاباتك عند التسليم',
+  examLiveAttempt: 'لديك محاولة قيد الأداء',
+  examScore: (score: number | string, max: number | string): string => `الدرجة ${score} / ${max}`,
+  // Ticket 20: labels that used to be inline in the exam page.
+  examDurationLabel: 'المدة',
+  examQuestionsLabel: 'الأسئلة',
+  examYourAttemptsLabel: 'محاولاتك',
+  examMinutesUnit: 'دقيقة',
+  examTrue: 'صح',
+  examFalse: 'خطأ',
+  examReview: 'مراجعة',
+  examAnswerPrompt: (max: number | string): string => `إجابتك (الدرجة العظمى ${max})`,
+  examTeacherNote: 'ملاحظة المعلم:',
+  examConfirmTitle: 'تأكيد التسليم',
+  examConfirmBody: 'لن تتمكن من التعديل بعد التسليم — راجع إجاباتك أولًا.',
+  examConfirmSubmit: 'تأكيد التسليم',
+  examTimeLeft: 'الوقت المتبقي',
+  examTimeUp: 'انتهى وقت المحاولة — لم يعد التعديل ممكنًا',
 } as const
 
 // Backend English detail → Arabic UI message (pass-through fallback keeps English).
@@ -142,6 +186,12 @@ const detailMap: Array<[RegExp, string]> = [
   [/attachments are supported/i, str.badFormat],
   [/too large/i, str.fileTooLarge],
   [/have a main book/i, str.mainBookOnly],
+  // Ticket 20: a second start is recovered from /attempts/me; this is the
+  // fallback shown only when no live attempt can be found.
+  [/already in progress/i, str.examLiveAttempt],
+  [/attempts limit reached/i, str.attemptsExhausted],
+  [/exam has not opened yet/i, str.examNotOpenYet],
+  [/exam window is closed/i, str.examWindowClosed],
 ]
 
 export function localizeDetail(detail: string): string {
@@ -149,4 +199,14 @@ export function localizeDetail(detail: string): string {
     if (re.test(detail)) return ar
   }
   return 'تعذّر — حاول مجددًا'
+}
+
+// Ticket 20: the exam seams answer in English and the SERVER knows who the
+// caller is, so the message is picked from the detail instead of re-deriving
+// the writer rule in the browser. A writer (ADR-0007) is told to use the
+// preview; anyone else is told they are not enrolled.
+export function localizeExamError(detail: string): string {
+  if (/only enrolled students may take/i.test(detail)) return str.examWriterOnly
+  if (/not enrolled in this course|not authorized/i.test(detail)) return str.examNotEnrolled
+  return localizeDetail(detail)
 }

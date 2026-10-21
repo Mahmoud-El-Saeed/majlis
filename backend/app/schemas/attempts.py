@@ -19,7 +19,13 @@ class AttemptAnswerIn(BaseModel):
     text_answer: str | None = None
 
 
-class AttemptSubmitIn(BaseModel):
+class AttemptAnswersIn(BaseModel):
+    """The student's current selection per question.
+
+    One shape for both routes because the payload is identical: autosave
+    stores it without a verdict, submit grades it.
+    """
+
     answers: list[AttemptAnswerIn] = Field(default_factory=list)
 
 

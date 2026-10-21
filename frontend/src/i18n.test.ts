@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { localizeDetail, str } from './i18n'
+import { localizeDetail, localizeExamError, str } from './i18n'
 
 describe('i18n detail mapping', () => {
   it('maps 429 to Arabic', () => {
@@ -56,5 +56,40 @@ describe('i18n detail mapping', () => {
     expect(str.uploadDone).toMatch(/تم الرفع/)
     expect(str.addAndUpload).toBe('إضافة ورفع')
     expect(str.formatPages('٤٥', '٦٢')).toMatch(/صفحات/)
+  })
+  it('centralizes ticket-20 exam-taking strings (Arabic only)', () => {
+    expect(str.resumeExam).toBe('متابعة الاختبار')
+    expect(str.enterExam).toBe('دخول الاختبار')
+    expect(str.myAttempts).toBe('محاولاتي')
+    expect(str.inProgress).toBe('قيد الأداء')
+    expect(str.submitted).toBe('تم التسليم')
+    expect(str.awaitingGrading).toBe('بانتظار التصحيح')
+    expect(str.awaitingPublish).toBe('بانتظار النشر')
+    expect(str.noAttempts).toBe('لا توجد محاولات بعد')
+    expect(str.backToCourse).toBe('عودة إلى السلسلة')
+    expect(str.examNotFound).toBe('الاختبار غير موجود')
+    expect(str.examNotEnrolled).toBe('لست مقيدًا في هذه السلسلة')
+    expect(str.examNoDescription).toBe('لا يوجد وصف لهذا الاختبار')
+    expect(str.loadingExam).toBe('جار تحميل الاختبار')
+    expect(str.resume).toBe('متابعة')
+    expect(str.attemptsExhausted).toBe('نفدت محاولاتك')
+    expect(str.startAttempt).toBe('بدء المحاولة')
+    expect(str.examLoadFailed).toBe('تعذّر تحميل الاختبار')
+    expect(str.examWriterOnly).toMatch(/لطلاب فقط/)
+    expect(str.examNotOpenYet).toBeTruthy()
+    expect(str.examWindowClosed).toBeTruthy()
+    expect(str.examStartFailed).toBeTruthy()
+    expect(str.examSubmitFailed).toBeTruthy()
+    expect(str.examAutosaveFailed).toMatch(/الحفظ التلقائي/)
+    expect(str.examScore(8, 10)).toBe('الدرجة 8 / 10')
+  })
+  it('maps the ticket-20 "already in progress" refusal to Arabic', () => {
+    expect(localizeDetail('An attempt is already in progress.')).toMatch(/قيد الأداء/)
+  })
+  it('tells a writer apart from a non-member without reading the role', () => {
+    expect(localizeExamError('Only enrolled students may take exams.')).toBe(str.examWriterOnly)
+    expect(localizeExamError('Not enrolled in this course.')).toBe(str.examNotEnrolled)
+    expect(localizeExamError('Not authorized.')).toBe(str.examNotEnrolled)
+    expect(localizeExamError('Account disabled.')).toBe(str.accountDisabled)
   })
 })

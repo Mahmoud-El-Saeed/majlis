@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, status
 
 from app.api.dependencies import CurrentUserDep, DbDep
-from app.schemas.attempts import AttemptOut, AttemptSubmitIn, to_attempt_out
+from app.schemas.attempts import AttemptAnswersIn, AttemptOut, to_attempt_out
 from app.services import attempt_service
 from app.services.attempt_service import AttemptError, AttemptForbidden, AttemptNotFound
 from app.services.course_service import CourseForbidden, CourseNotFound
@@ -60,9 +60,28 @@ async def get_attempt(db: DbDep, actor: CurrentUserDep, attempt_id: str) -> Atte
     return to_attempt_out(attempt, questions, answers, show_grades=show)
 
 
+@router.post("/attempts/{attempt_id}/answers", response_model=AttemptOut)
+async def save_answers(
+    db: DbDep, actor: CurrentUserDep, attempt_id: str, data: AttemptAnswersIn
+) -> AttemptOut:
+    """Autosave the current selection of an in-progress attempt (ticket 20).
+
+    Lets a student leave and come back to the same attempt: the selection is
+    stored without a verdict, so no grade is visible before the submit.
+    """
+    try:
+        attempt, questions, answers = await attempt_service.save_answers(
+            db, actor, attempt_id, data
+        )
+    except _ATTEMPT_ERRORS as e:
+        raise HTTPException(status_code=_error_status(e), detail=e.message) from None
+    # An in-progress attempt never shows grades.
+    return to_attempt_out(attempt, questions, answers, show_grades=False)
+
+
 @router.post("/attempts/{attempt_id}/submit", response_model=AttemptOut)
 async def submit_attempt(
-    db: DbDep, actor: CurrentUserDep, attempt_id: str, data: AttemptSubmitIn
+    db: DbDep, actor: CurrentUserDep, attempt_id: str, data: AttemptAnswersIn
 ) -> AttemptOut:
     try:
         attempt, exam, questions, answers = await attempt_service.submit_attempt(

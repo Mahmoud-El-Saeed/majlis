@@ -39,6 +39,7 @@ Single-context repo. Use these terms exactly as defined; do not drift to synonym
 - **Exam:** belongs to a course, optionally to one lesson (null lesson = general/book-wide). Config: attempts, duration, open/close window, pass score, show-result mode (immediate vs after-publish).
 - **Question types:** MCQ (2+ options, 1 correct), True/False, essay (max_score).
 - **Attempt:** one student sitting. MCQ/TF auto-scored on submit; essay pending until teacher grades with score + feedback.
+- **Draft answers:** while an attempt is in progress the student's current selection is autosaved per question, so leaving and returning reopens the *same* attempt with the same answers and the running timer. Only the submit button submits: an attempt that expires unsubmitted is auto-finalized at 0.
 - **Gradebook:** read projection over attempts per course, with CSV export. Scores visible to students only per the exam's publish setting.
 
 ## Knowledge & chat

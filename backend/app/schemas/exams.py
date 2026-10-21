@@ -127,6 +127,16 @@ class StudentExamOut(ExamOut):
     last_score: int | None = None
 
 
+class StudentExamDetailOut(StudentExamOut):
+    """Single student-safe exam read (ticket 20).
+
+    StudentExamOut plus the question COUNT only — the questions themselves
+    (prompt/options) and every answer key stay out of the payload.
+    """
+
+    questions_count: int
+
+
 def to_exam_out(exam) -> ExamOut:  # type: ignore[no-untyped-def]
     return ExamOut(
         id=str(exam.id),
@@ -203,3 +213,22 @@ def to_student_exam_out(  # type: ignore[no-untyped-def]
         window_status=_window_status(exam.open_at, exam.close_at, now),
         has_in_progress=has_in_progress,
     )
+
+
+def to_student_exam_detail_out(  # type: ignore[no-untyped-def]
+    exam,
+    *,
+    questions_count: int,
+    attempts_used: int,
+    has_in_progress: bool,
+    last_score: int | None,
+    now,
+) -> StudentExamDetailOut:
+    base = to_student_exam_out(
+        exam,
+        attempts_used=attempts_used,
+        has_in_progress=has_in_progress,
+        last_score=last_score,
+        now=now,
+    )
+    return StudentExamDetailOut(**base.model_dump(), questions_count=questions_count)

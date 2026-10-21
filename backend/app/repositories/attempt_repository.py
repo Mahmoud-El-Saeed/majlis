@@ -7,12 +7,23 @@ from app.models.attempt import Attempt, AttemptStatus
 
 
 class AttemptRepository:
-    async def get_by_id(self, db: AsyncSession, attempt_id: str) -> Attempt | None:
+    async def get_by_id(
+        self, db: AsyncSession, attempt_id: str, *, for_update: bool = False
+    ) -> Attempt | None:
+        """One attempt by id.
+
+        `for_update=True` locks the row, serializing the writing paths that
+        own the attempt's lifecycle (draft save, submit, expiry close) so a
+        late autosave can never land after a submit.
+        """
         try:
             aid = uuid.UUID(str(attempt_id))
         except ValueError:
             return None
-        result = await db.execute(select(Attempt).where(Attempt.id == aid))
+        stmt = select(Attempt).where(Attempt.id == aid)
+        if for_update:
+            stmt = stmt.with_for_update()
+        result = await db.execute(stmt)
         return result.scalars().first()
 
     def _exam_student(
@@ -55,11 +66,19 @@ class AttemptRepository:
         return int(result.scalar_one()) > 0
 
     async def list_in_progress(
-        self, db: AsyncSession, exam_id: uuid.UUID, student_id: uuid.UUID
+        self,
+        db: AsyncSession,
+        exam_id: uuid.UUID,
+        student_id: uuid.UUID,
+        *,
+        for_update: bool = False,
     ) -> list[Attempt]:
-        result = await db.execute(
-            select(Attempt).where(*self._exam_student(exam_id, student_id, only_in_progress=True))
+        stmt = select(Attempt).where(
+            *self._exam_student(exam_id, student_id, only_in_progress=True)
         )
+        if for_update:
+            stmt = stmt.with_for_update()
+        result = await db.execute(stmt)
         return list(result.scalars().all())
 
     async def unpublish_for_exam(self, db: AsyncSession, exam_id: uuid.UUID) -> None:

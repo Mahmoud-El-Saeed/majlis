@@ -17,7 +17,7 @@ from app.repositories.course_repository import course_repository
 from app.repositories.enrollment_repository import enrollment_repository
 from app.repositories.exam_repository import exam_repository
 from app.repositories.question_repository import question_repository
-from app.schemas.attempts import AttemptSubmitIn
+from app.schemas.attempts import AttemptAnswersIn
 from app.services.course_service import CourseNotFound
 
 
@@ -81,41 +81,133 @@ def _check_open_for_start(exam: Exam, now: datetime) -> None:
         raise AttemptError("Exam window is closed.")
 
 
-def _is_expired(exam: Exam, attempt: Attempt, now: datetime) -> bool:
+def is_expired(exam: Exam, attempt: Attempt, now: datetime) -> bool:
     late_by_timer = attempt.expires_at is not None and now > attempt.expires_at
     late_by_window = exam.close_at is not None and now >= exam.close_at
     return bool(late_by_timer or late_by_window)
 
 
+@dataclass(frozen=True)
+class AnswerSelection:
+    """One question's answer as the student sent it (draft or submit)."""
+
+    selected_index: int | None = None
+    selected_bool: bool | None = None
+    text_answer: str | None = None
+
+
 @dataclass
 class _GradingBatch:
-    """Questions plus the submitted payload per question; travels as one unit
-    through _finalize/_build_rows/_auto_finalize_expired."""
+    """Questions plus the submitted selections; travels as one unit
+    through _finalize/_grade_rows."""
 
     questions: list[Question] = field(default_factory=list)
-    by_question: dict[str, dict] = field(default_factory=dict)  # type: ignore[type-arg]
+    by_question: dict[str, AnswerSelection] = field(default_factory=dict)
 
 
-def _build_rows(attempt_id: object, batch: _GradingBatch) -> tuple[list[AttemptAnswer], int]:
-    """Grade every exam question (unanswered = 0) and sum the auto-score."""
-    rows: list[AttemptAnswer] = []
-    total = 0
-    for q in batch.questions:
-        payload = batch.by_question.get(str(q.id), {})
-        awarded, correct, needs = _grade_one(q, payload)
-        total += awarded
-        rows.append(
-            AttemptAnswer(
-                attempt_id=attempt_id,  # type: ignore[arg-type]
-                question_id=q.id,
-                selected_index=payload.get("selected_index"),
-                selected_bool=payload.get("selected_bool"),
-                text_answer=payload.get("text_answer"),
-                awarded_score=awarded,
-                is_correct=correct,
-                needs_grading=needs,
-            )
+def _selections_by_question(
+    questions: list[Question], data: AttemptAnswersIn
+) -> dict[str, AnswerSelection]:
+    """Map question id -> selection, rejecting illegal answer sets.
+
+    Shared by the draft (autosave) and the graded (submit) paths so the two
+    cannot drift: an unknown question id and a duplicated question id are both
+    rejected before anything is written.
+
+    A selection index is NOT range-checked against the question's options: the
+    upper bound is intentionally open (MCQ questions carry 2+ options), and an
+    out-of-range selection simply scores incorrect in the service. Rejecting it
+    would also strand a student whose teacher shortened a question while the
+    attempt was open.
+    """
+    by_id = {str(q.id) for q in questions}
+    seen: set[str] = set()
+    selections: dict[str, AnswerSelection] = {}
+    for ans in data.answers:
+        key = str(ans.question_id)
+        if key in seen:
+            raise AttemptError("Duplicate answer for question.")
+        if key not in by_id:
+            raise AttemptError("Unknown question.")
+        seen.add(key)
+        selections[key] = AnswerSelection(
+            selected_index=ans.selected_index,
+            selected_bool=ans.selected_bool,
+            text_answer=ans.text_answer.strip() if ans.text_answer else None,
         )
+    return selections
+
+
+async def _upsert_answer_rows(
+    db: AsyncSession,
+    attempt: Attempt,
+    questions: list[Question],
+    selections: dict[str, AnswerSelection],
+) -> list[AttemptAnswer]:
+    """One answer row per question, insert-or-update.
+
+    A row that already exists for (attempt, question) is updated in place —
+    drafts and the later submit share the same row, so the unique constraint
+    uq_attempt_answers_attempt_question can never be violated. A missing row
+    is created.
+    """
+    existing = await attempt_answer_repository.list_for_attempt_questions(
+        db, attempt.id, [q.id for q in questions]
+    )
+    rows: list[AttemptAnswer] = []
+    for q in questions:
+        selection = selections.get(str(q.id)) or AnswerSelection()
+        row = existing.get(q.id)
+        if row is None:
+            row = AttemptAnswer(attempt_id=attempt.id, question_id=q.id)
+        row.selected_index = selection.selected_index
+        row.selected_bool = selection.selected_bool
+        row.text_answer = selection.text_answer
+        rows.append(row)
+    return rows
+
+
+async def _save_draft_rows(
+    db: AsyncSession,
+    attempt: Attempt,
+    questions: list[Question],
+    selections: dict[str, AnswerSelection],
+) -> list[AttemptAnswer]:
+    """Draft path: a row per ANSWERED question, carrying the selection only.
+
+    A draft never carries a verdict — no score, no correctness, no pending
+    grade flag. Grading happens once, at submit.
+    """
+    answered = [q for q in questions if str(q.id) in selections]
+    rows = await _upsert_answer_rows(db, attempt, answered, selections)
+    for row in rows:
+        row.awarded_score = 0
+        row.is_correct = None
+        row.needs_grading = False
+    await attempt_answer_repository.save_all(db, rows)
+    return rows
+
+
+async def _grade_rows(
+    db: AsyncSession,
+    attempt: Attempt,
+    questions: list[Question],
+    selections: dict[str, AnswerSelection],
+) -> tuple[list[AttemptAnswer], int]:
+    """Graded path: a row per exam question (unanswered = 0) and the total.
+
+    The attempt total is the sum of the auto-graded scores; essay rows stay
+    pending for manual grading (ticket 09).
+    """
+    rows = await _upsert_answer_rows(db, attempt, questions, selections)
+    total = 0
+    for q, row in zip(questions, rows, strict=True):
+        awarded, correct, needs = _grade_one(q, selections.get(str(q.id)))
+        total += awarded
+        row.awarded_score = awarded
+        row.is_correct = correct
+        row.needs_grading = needs
+    await attempt_answer_repository.save_all(db, rows)
     return rows, total
 
 
@@ -127,33 +219,54 @@ async def _finalize(
     now: datetime,
 ) -> list[AttemptAnswer]:
     """Mark an in_progress attempt submitted: grade, stamp, publish per mode."""
-    rows, total = _build_rows(attempt.id, batch)
+    rows, total = await _grade_rows(db, attempt, batch.questions, batch.by_question)
     attempt.submitted_at = now
     attempt.status = AttemptStatus.submitted
     attempt.score = total
-    attempt.is_late = _is_expired(exam, attempt, now)
+    attempt.is_late = is_expired(exam, attempt, now)
     attempt.is_published = exam.show_result == ShowResultMode.immediate
-    await attempt_answer_repository.save_all(db, rows)
     await db.flush()
     await db.refresh(attempt)
     return rows
 
 
-async def _auto_finalize_expired(
-    db: AsyncSession,
-    exam: Exam,
-    questions: list[Question],
-    student_id: uuid.UUID,
-    now: datetime,
+async def _finalize_expired(
+    db: AsyncSession, attempt: Attempt, exam: Exam, now: datetime
 ) -> None:
-    """Close out timed-out in_progress rows so the one-active-attempt guard
-    never deadlocks a student who never pressed submit. Empty answers: the
-    attempt keeps whatever was never sent (all zeros here). Counts toward
-    attempts_limit like any submitted attempt."""
-    batch = _GradingBatch(questions=questions)
-    for stale in await attempt_repository.list_in_progress(db, exam.id, student_id):
-        if _is_expired(exam, stale, now):
-            await _finalize(db, stale, exam, batch, now)
+    """Close a timed-out attempt at 0 without erasing the saved selection.
+
+    Nothing was submitted, so every verdict is 0/ungraded; the draft the
+    student had written stays on the rows, so the receipt still shows what
+    they had chosen. Only submit grades.
+    """
+    for row in await attempt_answer_repository.list_for_attempt(db, attempt.id):
+        row.awarded_score = 0
+        row.is_correct = None
+        row.needs_grading = False
+    attempt.submitted_at = now
+    attempt.status = AttemptStatus.submitted
+    attempt.score = 0
+    attempt.is_late = True
+    attempt.is_published = exam.show_result == ShowResultMode.immediate
+    await db.flush()
+    await db.refresh(attempt)
+
+
+async def finalize_expired_attempts(
+    db: AsyncSession, exam: Exam, student_id: uuid.UUID, now: datetime
+) -> None:
+    """Close out timed-out in_progress rows.
+
+    Needed so the one-active-attempt guard never deadlocks a student who never
+    pressed submit, and so the gradebook sees the attempt. Safe to call from a
+    read: it only ever closes attempts the clock already closed.
+    """
+    stale_rows = await attempt_repository.list_in_progress(
+        db, exam.id, student_id, for_update=True
+    )
+    for stale in stale_rows:
+        if is_expired(exam, stale, now):
+            await _finalize_expired(db, stale, exam, now)
 
 
 async def start_attempt(
@@ -165,7 +278,7 @@ async def start_attempt(
     _check_open_for_start(exam, now)
 
     questions = await question_repository.list_for_exam(db, exam.id)
-    await _auto_finalize_expired(db, exam, questions, actor.id, now)
+    await finalize_expired_attempts(db, exam, actor.id, now)
 
     existing = await attempt_repository.count_for_exam_student(db, exam.id, actor.id)
     if existing >= exam.attempts_limit:
@@ -193,25 +306,31 @@ async def start_attempt(
     return attempt, questions, []
 
 
-def _grade_mcq(question: Question, payload: dict) -> tuple[int, bool | None, bool]:  # type: ignore[type-arg]
-    sel = payload.get("selected_index")
+def _grade_mcq(
+    question: Question, selection: AnswerSelection | None
+) -> tuple[int, bool | None, bool]:
+    sel = selection.selected_index if selection is not None else None
     if sel is None:
         return 0, False, False
     ok = sel == question.correct_index
     return (question.max_score if ok else 0), ok, False
 
 
-def _grade_tf(question: Question, payload: dict) -> tuple[int, bool | None, bool]:  # type: ignore[type-arg]
-    sel = payload.get("selected_bool")
+def _grade_tf(
+    question: Question, selection: AnswerSelection | None
+) -> tuple[int, bool | None, bool]:
+    sel = selection.selected_bool if selection is not None else None
     if sel is None:
         return 0, False, False
     ok = sel == question.correct_answer
     return (question.max_score if ok else 0), ok, False
 
 
-def _grade_essay(question: Question, payload: dict) -> tuple[int, bool | None, bool]:  # type: ignore[type-arg]
-    # Essay: always pending for manual grading (ticket 09). Payload unused.
-    _ = (question, payload)
+def _grade_essay(
+    question: Question, selection: AnswerSelection | None
+) -> tuple[int, bool | None, bool]:
+    # Essay: always pending for manual grading (ticket 09). Selection unused.
+    _ = (question, selection)
     return 0, None, True
 
 
@@ -222,15 +341,62 @@ _GRADERS = {
 }
 
 
-def _grade_one(question: Question, payload: dict) -> tuple[int, bool | None, bool]:  # type: ignore[type-arg]
+def _grade_one(
+    question: Question, selection: AnswerSelection | None
+) -> tuple[int, bool | None, bool]:
     """Return (awarded_score, is_correct, needs_grading). Missing answers score 0."""
-    return _GRADERS[str(question.type.value)](question, payload)
+    return _GRADERS[str(question.type.value)](question, selection)
+
+
+async def save_answers(
+    db: AsyncSession, actor: User, attempt_id: str, data: AttemptAnswersIn
+) -> tuple[Attempt, list[Question], list[AttemptAnswer]]:
+    """Autosave the current selection of an in-progress attempt (ticket 20).
+
+    Same ownership and trust checks as submit: only the taker may write, and
+    a student blocked/disabled after starting loses the right to save (the
+    ban keeps its scope). The draft is stored without a verdict — grading
+    happens once, at submit.
+
+    The attempt row is locked (FOR UPDATE) for the same reason submit locks
+    it: without it an autosave that started before a submit could commit
+    after it and overwrite the graded rows with a draft.
+    """
+    attempt = await attempt_repository.get_by_id(db, attempt_id, for_update=True)
+    if attempt is None:
+        raise AttemptNotFound("Attempt not found.")
+    _require_owner(attempt, actor)
+    exam = await exam_repository.get_by_id(db, str(attempt.exam_id))
+    if exam is None:
+        raise AttemptNotFound("Exam not found.")
+    course = await _course_for_exam(db, exam)
+    # Re-check trust at save time: a student blocked/disabled after
+    # starting loses the right to write (ban keeps its scope, CONTEXT.md).
+    await _require_student_taker(db, actor, course)
+    if attempt.status != AttemptStatus.in_progress:
+        raise AttemptError("Attempt already submitted.")
+
+    questions = await question_repository.list_for_exam(db, exam.id)
+    selections = _selections_by_question(questions, data)
+    rows = await _save_draft_rows(db, attempt, questions, selections)
+    return attempt, questions, rows
 
 
 async def submit_attempt(
-    db: AsyncSession, actor: User, attempt_id: str, data: AttemptSubmitIn
+    db: AsyncSession, actor: User, attempt_id: str, data: AttemptAnswersIn
 ) -> tuple[Attempt, Exam, list[Question], list[AttemptAnswer]]:
-    attempt = await attempt_repository.get_by_id(db, attempt_id)
+    """Grade the attempt and close it.
+
+    The payload is authoritative: every exam question gets exactly one answer
+    row (upsert — a draft saved earlier is updated in place, never
+    duplicated), and the stored selection is the submitted one. A question
+    the payload leaves out is stored unanswered and scores 0, exactly as
+    before drafts existed.
+
+    The attempt row is locked (FOR UPDATE) so a draft save, a second submit or
+    a concurrent expiry cannot interleave with this grading write.
+    """
+    attempt = await attempt_repository.get_by_id(db, attempt_id, for_update=True)
     if attempt is None:
         raise AttemptNotFound("Attempt not found.")
     _require_owner(attempt, actor)
@@ -245,24 +411,9 @@ async def submit_attempt(
         raise AttemptError("Attempt already submitted.")
 
     questions = await question_repository.list_for_exam(db, exam.id)
-    by_id = {str(q.id): q for q in questions}
+    selections = _selections_by_question(questions, data)
 
-    seen: set[str] = set()
-    payload_by_q: dict[str, dict] = {}
-    for ans in data.answers:
-        key = str(ans.question_id)
-        if key in seen:
-            raise AttemptError("Duplicate answer for question.")
-        if key not in by_id:
-            raise AttemptError("Unknown question.")
-        seen.add(key)
-        payload_by_q[key] = {
-            "selected_index": ans.selected_index,
-            "selected_bool": ans.selected_bool,
-            "text_answer": ans.text_answer.strip() if ans.text_answer else None,
-        }
-
-    batch = _GradingBatch(questions=questions, by_question=payload_by_q)
+    batch = _GradingBatch(questions=questions, by_question=selections)
     rows = await _finalize(db, attempt, exam, batch, datetime.now(UTC))
     return attempt, exam, questions, rows
 
