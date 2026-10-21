@@ -40,7 +40,7 @@
     {
       "id": "join_code_revoked",
       "detail": "Join code revoked.",
-      "ar": "رُفض رمز السلسلة — أوقفه المعلم"
+      "ar": "أُلغي رمز السلسلة — أوقفه المعلم"
     },
     {
       "id": "join_code_expired",
@@ -50,7 +50,7 @@
     {
       "id": "join_code_exhausted",
       "detail": "Join code has no uses left.",
-      "ar": "استُهلك رمز السلسلة بالكامل — اطلب رمزًا جديدًا من الشيخ"
+      "ar": "استُهلك رمز السلسلة بالكامل — اطلب رمزًا جديدًا من المعلم"
     },
     {
       "id": "join_code_not_found",
@@ -489,7 +489,7 @@
     },
     {
       "id": "validation_blank",
-      "pattern": "^String should have at least 1 character",
+      "pattern": "^String should have at least 1 character$",
       "sample": "String should have at least 1 character",
       "ar": "لا يمكن ترك الحقل فارغًا",
       "framework": true
@@ -501,10 +501,10 @@
       "framework": true
     },
     {
-      "id": "validation_password_short",
-      "pattern": "^String should have at least 8 characters",
+      "id": "validation_too_short",
+      "pattern": "^String should have at least \\d+ characters?$",
       "sample": "String should have at least 8 characters",
-      "ar": "القيمة قصيرة — 8 أحرف على الأقل",
+      "ar": "القيمة أقصر من الحد المسموح",
       "framework": true
     },
     {
@@ -526,13 +526,6 @@
       "pattern": "^Input should be greater than 0$",
       "sample": "Input should be greater than 0",
       "ar": "القيمة يجب أن تكون أكبر من صفر",
-      "framework": true
-    },
-    {
-      "id": "validation_above_min",
-      "pattern": "^Input should be greater than \\d+$",
-      "sample": "Input should be greater than 10",
-      "ar": "القيمة أكبر من الحد المسموح",
       "framework": true
     },
     {
@@ -570,10 +563,16 @@
       "framework": true
     },
     {
+      "id": "validation_type",
+      "pattern": "^Input should be a valid ",
+      "sample": "Input should be a valid integer, unable to parse string as an integer",
+      "ar": "قيمة غير صالحة",
+      "framework": true
+    },
+    {
       "id": "validation_blank_name",
       "detail": "Value error, Name must not be blank.",
-      "ar": "الاسم لا يمكن أن يكون فارغًا",
-      "framework": true
+      "ar": "الاسم لا يمكن أن يكون فارغًا"
     }
   ]
 }

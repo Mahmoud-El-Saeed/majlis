@@ -180,8 +180,8 @@ async function installFakeApi(page: Page, options: FakeOptions = {}): Promise<vo
 const ARABIC: Record<string, string> = {
   'Invalid join code.': 'رمز السلسلة غير صحيح',
   'Join code expired.': 'انتهت صلاحية رمز السلسلة',
-  'Join code revoked.': 'رُفض رمز السلسلة — أوقفه الشيخ',
-  'Join code has no uses left.': 'استُهلك رمز السلسلة بالكامل — اطلب رمزًا جديدًا من الشيخ',
+  'Join code revoked.': 'أُلغي رمز السلسلة — أوقفه المعلم',
+  'Join code has no uses left.': 'استُهلك رمز السلسلة بالكامل — اطلب رمزًا جديدًا من المعلم',
   'An attempt is already in progress.': 'لديك محاولة قيد الأداء — أكملها قبل بدء محاولة جديدة',
   'Attempts limit reached.': 'نفدت محاولاتك في هذا الاختبار',
 }
@@ -189,55 +189,63 @@ const ARABIC: Record<string, string> = {
 /** The generic fallback — never shown for a failure that has its own copy. */
 const GENERIC_FALLBACK = 'تعذّر إتمام الطلب'
 
-test('mocked: an invalid join code shows its own Arabic, not the generic fallback', async ({
-  page,
-}) => {
-  await installFakeApi(page, { joinDetail: 'Invalid join code.' })
+const VIEWPORTS = [
+  ['desktop', 1280, 720],
+  ['390px', 390, 844],
+] as const
 
-  await page.goto('/dashboard')
-  await page.getByRole('button', { name: 'انضم برمز السلسلة' }).click()
-  await page.getByLabel('الرمز').fill('WRONG1')
-  await page.getByRole('button', { name: 'انضم', exact: true }).click()
+const JOIN_FAILURES = [
+  ['invalid', 'Invalid join code.', 'WRONG1'],
+  ['expired', 'Join code expired.', 'EXPIRED'],
+  ['revoked', 'Join code revoked.', 'REVOKED'],
+  ['exhausted', 'Join code has no uses left.', 'USEDUP'],
+] as const
 
-  const alert = page.getByRole('alert')
-  await expect(alert).toHaveText(ARABIC['Invalid join code.'])
-  await expect(alert).not.toHaveText(GENERIC_FALLBACK)
-})
+// The spec asks for both viewports: the long Arabic messages are the ones
+// most likely to overflow a phone.
+for (const [viewport, width, height] of VIEWPORTS) {
+  for (const [kind, detail, code] of JOIN_FAILURES) {
+    test(`mocked (${viewport}): ${kind} join code shows its own Arabic`, async ({ page }) => {
+      await page.setViewportSize({ width, height })
+      await installFakeApi(page, { joinDetail: detail })
 
-test('mocked: an expired join code shows its own Arabic', async ({ page }) => {
-  await installFakeApi(page, { joinDetail: 'Join code expired.' })
+      await page.goto('/dashboard')
+      await page.getByRole('button', { name: 'انضم برمز السلسلة' }).click()
+      await page.getByLabel('الرمز').fill(code)
+      await page.getByRole('button', { name: 'انضم', exact: true }).click()
 
-  await page.goto('/dashboard')
-  await page.getByRole('button', { name: 'انضم برمز السلسلة' }).click()
-  await page.getByLabel('الرمز').fill('EXPIRED')
-  await page.getByRole('button', { name: 'انضم', exact: true }).click()
+      const alert = page.getByRole('alert')
+      await expect(alert).toHaveText(ARABIC[detail])
+      await expect(alert).not.toHaveText(GENERIC_FALLBACK)
+    })
+  }
 
-  const alert = page.getByRole('alert')
-  await expect(alert).toHaveText(ARABIC['Join code expired.'])
-  await expect(alert).not.toHaveText(GENERIC_FALLBACK)
-})
+  test(`mocked (${viewport}): an active-attempt conflict shows its own Arabic`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height })
+    await installFakeApi(page, { startDetail: 'An attempt is already in progress.' })
 
-test('mocked: an active-attempt conflict shows its own Arabic', async ({ page }) => {
-  await installFakeApi(page, { startDetail: 'An attempt is already in progress.' })
+    await page.goto(`/exams/${EXAM_ID}`)
+    await page.getByRole('button', { name: 'بدء المحاولة' }).click()
 
-  await page.goto(`/exams/${EXAM_ID}`)
-  await page.getByRole('button', { name: 'بدء المحاولة' }).click()
+    const alert = page.getByRole('alert')
+    await expect(alert).toHaveText(ARABIC['An attempt is already in progress.'])
+    await expect(alert).not.toHaveText(GENERIC_FALLBACK)
+  })
 
-  const alert = page.getByRole('alert')
-  await expect(alert).toHaveText(ARABIC['An attempt is already in progress.'])
-  await expect(alert).not.toHaveText(GENERIC_FALLBACK)
-})
+  test(`mocked (${viewport}): the attempts limit shows its own Arabic`, async ({ page }) => {
+    await page.setViewportSize({ width, height })
+    await installFakeApi(page, { startDetail: 'Attempts limit reached.' })
 
-test('mocked: the attempts limit shows its own Arabic', async ({ page }) => {
-  await installFakeApi(page, { startDetail: 'Attempts limit reached.' })
+    await page.goto(`/exams/${EXAM_ID}`)
+    await page.getByRole('button', { name: 'بدء المحاولة' }).click()
 
-  await page.goto(`/exams/${EXAM_ID}`)
-  await page.getByRole('button', { name: 'بدء المحاولة' }).click()
-
-  const alert = page.getByRole('alert')
-  await expect(alert).toHaveText(ARABIC['Attempts limit reached.'])
-  await expect(alert).not.toHaveText(GENERIC_FALLBACK)
-})
+    const alert = page.getByRole('alert')
+    await expect(alert).toHaveText(ARABIC['Attempts limit reached.'])
+    await expect(alert).not.toHaveText(GENERIC_FALLBACK)
+  })
+}
 
 /** The account page owns the direction; the document keeps Arabic RTL. */
 async function expectScopedLanguage(page: Page): Promise<void> {

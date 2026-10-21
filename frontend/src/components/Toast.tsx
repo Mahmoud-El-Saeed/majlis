@@ -69,7 +69,12 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       {/* Offset above the FAB layer so messages never cover the primary action. */}
       <div className="fixed bottom-24 inset-x-0 z-50 flex flex-col items-center gap-2 px-4" aria-live="polite">
         {items.map((t) => (
-          <div key={t.id} role="status" className="toast-msg transition-ui flex items-center gap-3 rounded-xl px-5 py-3 text-sm shadow-lg">
+          <div
+            key={t.id}
+            role="status"
+            dir="auto"
+            className="toast-msg transition-ui flex items-center gap-3 rounded-xl px-5 py-3 text-sm shadow-lg"
+          >
             <span>{t.msg}</span>
             <button
               type="button"
