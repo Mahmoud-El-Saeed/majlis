@@ -23,8 +23,8 @@ Single-context layout with root `CONTEXT.md` + `docs/adr/`. See `docs/agents/dom
 - Tests run on Postgres (`majlis_test`), never SQLite; isolate per test.
 - Migrations, every time: models → `autogenerate` → read → fix → `upgrade head` → test. Hand-fix PG ENUM alters; prove reversibility.
 - Migrations stay sync, app code async; never block the event loop.
-- Arabic-first in frontend (`i18n.ts`); backend messages English; backend emails Arabic.
-- A new backend error detail needs an entry in `frontend/src/i18n/details.json` (the Arabic, or a deliberate pass-through with a reason). `backend/tests/test_error_details_contract.py` enforces it; the generic fallback never says "try again".
+- Arabic-first in frontend (`i18n.ts` + `i18n/details.json`); backend messages English; backend emails Arabic.
+- A new backend error detail needs an entry in `frontend/src/i18n/details.json` (the Arabic, or a deliberate pass-through with a reason). `backend/tests/test_error_details_contract.py` enforces the coverage; the generic fallback never says "try again" (`frontend/src/i18n.test.ts`).
 - Role is a capability level: enrollment checks membership, never `role == "student"`; inviting a student promotes.
 - TDD at seams; `ty` + single files during, full suite at end; `/code-review`, then fix findings.
 - Never commit without an explicit instruction.

@@ -109,7 +109,8 @@ describe('api client transport', () => {
     }
   })
 
-  it('downloadCsv fetches blob with auth header', async () => {    const fetchMock = vi.fn(
+  it('downloadCsv fetches blob with auth header', async () => {
+    const fetchMock = vi.fn(
       async () =>
         new Response('a,b\n1,2', {
           status: 200,

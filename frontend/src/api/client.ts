@@ -1,7 +1,7 @@
 // Typed API transport for Majlis backend (/api/v1).
 // Bearer + silent refresh (both tokens rotate), 429 Arabic toast, CSV blob.
 // Backend messages stay English; frontend maps to Arabic via i18n.ts.
-import { str } from '../i18n'
+import { rateLimitedMessage } from '../i18n'
 
 export class ApiError extends Error {
   status: number
@@ -125,7 +125,7 @@ export function createClient(opts: ClientOpts) {
       throw new ApiError(401, await parseDetail(res))
     }
     if (res.status === 429) {
-      opts.onToast(str.tooMany)
+      opts.onToast(rateLimitedMessage)
       throw new ApiError(429, await parseDetail(res))
     }
     if (!res.ok) {

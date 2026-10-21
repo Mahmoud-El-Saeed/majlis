@@ -43,9 +43,7 @@ export const str = {
   submit: 'تسليم',
   publish: 'نشر',
   exportCsv: 'تصدير CSV',
-  tooMany: 'طلبات كثيرة — حاول مجددًا بعد قليل',
-  busy: 'الذكاء الاصطناعي مشغول — حاول لاحقًا',
-  quota: 'الاستعلامات اليومية',
+  busy: 'الذكاء الاصطناعي مشغول — حاول لاحقًا',  quota: 'الاستعلامات اليومية',
   refused: 'لم يُشرح في الدروس',
   citation: 'الاستشهاد',
   stubNote: 'واجهة تجريبية — تُفعّل بعد بناء الواجهة الخلفية',
@@ -172,7 +170,7 @@ export const str = {
 // backend/tests/test_error_details_contract.py fails when a service raises a
 // detail that has no entry here, so a new error can never ship untranslated.
 
-type CatalogEntry = {
+export type CatalogEntry = {
   id: string
   detail?: string
   pattern?: string
@@ -190,6 +188,21 @@ const matchers = catalog.map((entry) => ({
     ? (detail: string) => detail === entry.detail
     : (detail: string) => new RegExp(entry.pattern as string).test(detail),
 }))
+
+/**
+ * The Arabic for a catalog entry, addressed by its stable id.
+ *
+ * The id is the contract: the English detail belongs to the backend and may
+ * be reworded, but an id never changes, so a caller that needs a specific
+ * message (a client-side guard, a seam with its own context) reaches it
+ * without re-typing the backend's English.
+ */
+export function detailById(id: string): string {
+  return catalog.find((entry) => entry.id === id)?.ar ?? str.unexpectedError
+}
+
+/** The 429 message — one copy, shared by the toast and the inline error. */
+export const rateLimitedMessage = detailById('rate_limited')
 
 function localizeOne(detail: string): string {
   for (const { entry, matches } of matchers) {
@@ -215,6 +228,6 @@ export function localizeDetail(detail: string): string {
 // rule in the browser. A writer (ADR-0007) is told to use the preview; anyone
 // else is told they are not enrolled.
 export function localizeExamError(detail: string): string {
-  if (/not authorized/i.test(detail)) return localizeDetail('Not enrolled in this course.')
+  if (/not authorized/i.test(detail)) return detailById('exam_not_enrolled')
   return localizeDetail(detail)
 }

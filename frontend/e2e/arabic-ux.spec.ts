@@ -30,6 +30,8 @@ type FakeOptions = {
   joinDetail?: string
   /** The English detail the attempt-start endpoint refuses with. */
   startDetail?: string
+  /** The role the fake student/teacher has. */
+  role?: 'student' | 'teacher'
 }
 
 function json(route: Route, body: unknown, status = 200): Promise<void> {
@@ -39,6 +41,33 @@ function json(route: Route, body: unknown, status = 200): Promise<void> {
     headers: { ...CORS_HEADERS },
     body: JSON.stringify(body),
   })
+}
+
+const COURSE = {
+  id: 'C1',
+  title: 'سلسلة الفقه',
+  description: 'وصف السلسلة',
+  book_title: null,
+  owner_id: 'T1',
+  created_at: '2026-01-01T00:00:00Z',
+}
+
+const LESSON = {
+  id: 'L1',
+  course_id: 'C1',
+  title: 'الدرس الأول',
+  description: 'وصف الدرس',
+  lesson_date: '2026-01-02',
+  pages_from: null,
+  pages_to: null,
+  media_type: 'audio',
+  status: 'ready',
+  attachment_count: 0,
+  created_at: '2026-01-02T00:00:00Z',
+  audio_key: 'lessons/L1/audio.m4a',
+  transcript_voice: null,
+  transcript_book: null,
+  can_manage: true,
 }
 
 function studentExam() {
@@ -79,10 +108,10 @@ async function installFakeApi(page: Page, options: FakeOptions = {}): Promise<vo
     // The AuthProvider asks who the student is.
     if (path === '/auth/me') {
       await json(route, {
-        id: 'S1',
-        email: 'student@example.com',
-        full_name: 'طالب الاختبار',
-        role: 'student',
+        id: options.role === 'teacher' ? 'T1' : 'S1',
+        email: options.role === 'teacher' ? 'teacher@example.com' : 'student@example.com',
+        full_name: options.role === 'teacher' ? 'المعلم' : 'طالب الاختبار',
+        role: options.role ?? 'student',
         is_verified: true,
       })
       return
@@ -90,6 +119,33 @@ async function installFakeApi(page: Page, options: FakeOptions = {}): Promise<vo
 
     if (path === '/dashboard') {
       await json(route, { items: [] })
+      return
+    }
+
+    // The course, its lessons and its files — the pages the direction scope
+    // has to leave alone.
+    if (path === '/courses/C1') {
+      await json(route, COURSE)
+      return
+    }
+    if (path === '/courses/C1/lessons') {
+      await json(route, [LESSON])
+      return
+    }
+    if (path === '/courses/C1/my-enrollment') {
+      await json(route, null)
+      return
+    }
+    if (path === '/courses/C1/student-exams') {
+      await json(route, [])
+      return
+    }
+    if (path === '/courses/C1/attachments' || path === '/courses/C1/lessons/L1/attachments') {
+      await json(route, [])
+      return
+    }
+    if (path === '/lessons/L1') {
+      await json(route, LESSON)
       return
     }
 
@@ -201,12 +257,20 @@ async function expectScopedLanguage(page: Page): Promise<void> {
   await expect(page.locator('html')).toHaveAttribute('dir', 'rtl')
   await expect(page.locator('html')).toHaveAttribute('lang', 'ar')
 
-  // The dashboard, the course and the teacher pages stay RTL.
-  await page.goto('/dashboard')
-  await expect(page.locator('html')).toHaveAttribute('dir', 'rtl')
-  await expect(page.getByRole('heading', { name: 'سلاسلي' })).toBeVisible()
-  await page.goto('/teach')
-  await expect(page.locator('html')).toHaveAttribute('dir', 'rtl')
+  // The pages the spec names keep their Arabic RTL direction: the
+  // dashboard, the course, the lesson, the exam and the teacher pages.
+  const pages: Array<[string, string]> = [
+    ['/dashboard', 'سلاسلي'],
+    ['/courses/C1', 'سلسلة الفقه'],
+    ['/lessons/L1', 'الدرس الأول'],
+    [`/exams/${EXAM_ID}`, EXAM_TITLE],
+    ['/teach', 'لوحة المعلم'],
+  ]
+  for (const [path, heading] of pages) {
+    await page.goto(path)
+    await expect(page.locator('html')).toHaveAttribute('dir', 'rtl')
+    await expect(page.getByRole('heading', { name: heading }).first()).toBeVisible()
+  }
 
   // The choice survives a reload, with no direction flash.
   await page.goto('/account')
@@ -223,12 +287,12 @@ async function expectScopedLanguage(page: Page): Promise<void> {
 
 test('scoped language: English flips the account page only (desktop)', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 720 })
-  await installFakeApi(page)
+  await installFakeApi(page, { role: 'teacher' })
   await expectScopedLanguage(page)
 })
 
 test('scoped language: English flips the account page only (390px)', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 })
-  await installFakeApi(page)
+  await installFakeApi(page, { role: 'teacher' })
   await expectScopedLanguage(page)
 })

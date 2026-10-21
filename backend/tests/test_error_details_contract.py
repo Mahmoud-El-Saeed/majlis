@@ -90,6 +90,33 @@ def _renderings(parts: list[str]) -> set[str]:
     return out
 
 
+def _message_table_names() -> set[str]:
+    """Names of the module-level tables that hold refusal messages.
+
+    A private module-level dict is the repo's one way of keeping messages
+    out of a raise site (the approval transition table _DECISIONS). The
+    public ones are file-type maps, not messages.
+    """
+    names: set[str] = set()
+    for path in sorted((APP_ROOT / "services").rglob("*.py")):
+        tree = ast.parse(path.read_text())
+        for node in tree.body:
+            if isinstance(node, ast.Assign):
+                table = node.value
+                targets = node.targets
+            elif isinstance(node, ast.AnnAssign):
+                table = node.value
+                targets = [node.target]
+            else:
+                continue
+            if not isinstance(table, ast.Dict):
+                continue
+            for target in targets:
+                if isinstance(target, ast.Name) and target.id.startswith("_"):
+                    names.add(target.id)
+    return names
+
+
 def _message_table_values() -> set[str]:
     """Message strings kept in a module-level table instead of a raise site.
 
@@ -102,18 +129,22 @@ def _message_table_values() -> set[str]:
         for node in tree.body:
             if isinstance(node, ast.Assign):
                 table = node.value
+                targets = node.targets
             elif isinstance(node, ast.AnnAssign):
                 table = node.value
+                targets = [node.target]
             else:
                 continue
             if not isinstance(table, ast.Dict):
                 continue
+            private = any(
+                isinstance(t, ast.Name) and t.id.startswith("_") for t in targets
+            )
+            if not private:
+                continue
             for value in table.values:
                 for inner in ast.walk(value):
-                    if not isinstance(inner, ast.Constant) or not isinstance(inner.value, str):
-                        continue
-                    # A message reads like a sentence; a mime type does not.
-                    if " " in inner.value and inner.value.endswith("."):
+                    if isinstance(inner, ast.Constant) and isinstance(inner.value, str):
                         found.add(inner.value)
     return found
 
@@ -159,6 +190,130 @@ def collect_details() -> set[str]:
 
     details |= _message_table_values()
     return details
+
+
+def collect_dynamic_detail_sites() -> list[str]:
+    """Raise sites whose message is NOT a literal, so it cannot be catalogued.
+
+    A detail built at runtime ("x" + var, f"{var} failed", a formatted
+    string) would slip past the coverage check and reach the user with no
+    Arabic. The only allowed indirection is a lookup in a message table.
+    """
+    tables = _message_table_names()
+    sites: list[str] = []
+    for path in sorted((APP_ROOT / "services").rglob("*.py")):
+        tree = ast.parse(path.read_text())
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Raise) or not isinstance(node.exc, ast.Call):
+                continue
+            func = node.exc.func
+            name = func.id if isinstance(func, ast.Name) else getattr(func, "attr", "")
+            if name not in _domain_error_names():
+                continue
+            for arg in node.exc.args:
+                if _string_parts(arg) is not None:
+                    continue
+                if isinstance(arg, ast.Name) and _reads_from_table(arg.id, tree, tables):
+                    continue
+                sites.append(f"{path}:{node.lineno} ({ast.unparse(arg)})")
+    return sites
+
+
+def _reads_from_table(name: str, tree: ast.Module, tables: set[str]) -> bool:
+    """True when the variable is read straight out of a message table."""
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Assign):
+            continue
+        if not any(isinstance(t, ast.Name) and t.id == name for t in node.targets):
+            continue
+        value = node.value
+        if isinstance(value, ast.Subscript):
+            base = value.value
+            while isinstance(base, ast.Subscript):
+                base = base.value
+            if isinstance(base, ast.Name) and base.id in tables:
+                return True
+    return False
+
+
+def collect_validation_messages() -> set[str]:
+    """The 422 messages the request schemas can produce.
+
+    Pydantic's wording is fixed, so it is derived from the schemas here
+    instead of being hard-coded: a new constraint shows up as a new message
+    the catalog must cover.
+    """
+    messages: set[str] = set()
+    for path in sorted((APP_ROOT / "schemas").rglob("*.py")):
+        tree = ast.parse(path.read_text())
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Call):
+                func = node.func
+                name = func.id if isinstance(func, ast.Name) else getattr(func, "attr", "")
+                if name != "Field":
+                    continue
+                for keyword in node.keywords:
+                    value = keyword.value
+                    if not isinstance(value, ast.Constant) or not isinstance(value.value, int):
+                        continue
+                    number = value.value
+                    if keyword.arg == "min_length":
+                        messages.add(f"String should have at least {_characters(number)}")
+                    elif keyword.arg == "max_length":
+                        messages.add(f"String should have at most {_characters(number)}")
+                    elif keyword.arg == "ge":
+                        messages.add(f"Input should be greater than or equal to {number}")
+                    elif keyword.arg == "le":
+                        messages.add(f"Input should be less than or equal to {number}")
+                    elif keyword.arg == "gt":
+                        messages.add(f"Input should be greater than {number}")
+            if isinstance(node, ast.AnnAssign):
+                _annotation_messages(node.annotation, messages)
+            if isinstance(node, ast.arg):
+                _annotation_messages(node.annotation, messages)
+    if messages:
+        # Every request model with a required field produces this one.
+        messages.add("Field required")
+    return messages
+
+
+def _annotation_messages(annotation: ast.AST | None, messages: set[str]) -> None:
+    if annotation is None:
+        return
+    for node in ast.walk(annotation):
+        if isinstance(node, ast.Subscript) and isinstance(node.value, ast.Name):
+            if node.value.id == "Literal":
+                elements = (
+                    node.slice.elts if isinstance(node.slice, ast.Tuple) else [node.slice]
+                )
+                values = [
+                    element.value
+                    for element in elements
+                    if isinstance(element, ast.Constant) and isinstance(element.value, str)
+                ]
+                if values:
+                    messages.add(_literal_message(values))
+        elif isinstance(node, ast.Name) and node.id == "EmailStr":
+            messages.add(
+                "value is not a valid email address: An email address must have an @-sign."
+            )
+        elif isinstance(node, ast.Name) and node.id == "UUID":
+            # Pydantic appends the offending character, so only the prefix is
+            # fixed; the catalog matches it with a pattern.
+            messages.add("Input should be a valid UUID")
+
+
+def _characters(count: int) -> str:
+    """Pydantic pluralizes: one character, many characters."""
+    return f"{count} character" if count == 1 else f"{count} characters"
+
+
+def _literal_message(values: list[str]) -> str:
+    """Pydantic's wording for a Literal with the given members."""
+    quoted = [f"'{value}'" for value in values]
+    if len(quoted) == 1:
+        return f"Input should be {quoted[0]}"
+    return f"Input should be {', '.join(quoted[:-1])} or {quoted[-1]}"
 
 
 def load_catalog() -> list[dict]:
@@ -208,6 +363,28 @@ def test_every_service_raised_detail_has_a_message() -> None:
     assert not uncovered, (
         "these backend details have no Arabic message in "
         f"{CATALOG_PATH.relative_to(REPO_ROOT)}:\n  " + "\n  ".join(uncovered)
+    )
+
+
+def test_every_validation_message_has_a_message() -> None:
+    entries = load_catalog()
+    uncovered = sorted(
+        message
+        for message in collect_validation_messages()
+        if not any(_entry_matches(entry, message) for entry in entries)
+    )
+    assert not uncovered, (
+        "these 422 validation messages have no Arabic message in "
+        f"{CATALOG_PATH.relative_to(REPO_ROOT)}:\n  " + "\n  ".join(uncovered)
+    )
+
+
+def test_no_detail_is_built_at_runtime() -> None:
+    """A detail assembled at runtime cannot be catalogued, so it is a bug."""
+    sites = collect_dynamic_detail_sites()
+    assert not sites, (
+        "these errors build their message at runtime and would reach the user "
+        "with no Arabic:\n  " + "\n  ".join(sites)
     )
 
 

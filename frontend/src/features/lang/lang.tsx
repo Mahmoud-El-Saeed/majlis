@@ -6,9 +6,12 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 //
 // The choice is scoped (ticket 21): it never touches the document direction.
 // <html> stays Arabic RTL for the whole app, and the account page flips ITS
-// OWN direction, so picking English cannot reflow the dashboard, the course,
-// the lesson, the exam or the teacher pages. Because the document direction
-// never changes, a reload can never flash the wrong direction either.
+// OWN direction, so picking English cannot change the direction or the
+// layout of the dashboard, the course, the lesson, the exam or the teacher
+// pages. (The account link in the navbar keeps its own bilingual label —
+// that is the nav entry ticket 18 asked for, not a direction change.)
+// Because the document direction never changes, a reload can never flash the
+// wrong direction either.
 export type Lang = 'ar' | 'en'
 
 const KEY = 'mj_lang'

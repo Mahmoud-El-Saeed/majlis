@@ -24,7 +24,7 @@
       "id": "code_max_active",
       "pattern": "^Too many active codes for this course",
       "sample": "Too many active codes for this course (max 5). Revoke an old code first.",
-      "ar": "بلغت الحد الأقصى للأكواد النشطة في هذه السلسلة — ألغِ كودًا قديمًا أولًا"
+      "ar": "بلغت الحد الأقصى لرموز السلسلة النشطة في هذه السلسلة — ألغِ رمزًا قديمًا أولًا"
     },
     {
       "id": "attachment_too_large",
@@ -40,7 +40,7 @@
     {
       "id": "join_code_revoked",
       "detail": "Join code revoked.",
-      "ar": "رُفض رمز السلسلة — أوقفه الشيخ"
+      "ar": "رُفض رمز السلسلة — أوقفه المعلم"
     },
     {
       "id": "join_code_expired",
@@ -60,7 +60,7 @@
     {
       "id": "code_generate_failed",
       "detail": "Could not generate a unique code. Try again.",
-      "ar": "تعذّر توليد رمز فريد — أعد المحاولة"
+      "ar": "تعذّر توليد رمز سلسلة فريد — أعد المحاولة"
     },
     {
       "id": "join_verify_email",
@@ -75,7 +75,7 @@
     {
       "id": "join_already_enrolled",
       "detail": "Already enrolled in this course.",
-      "ar": "أنت منضم إلى هذه السلسلة بالفعل"
+      "ar": "أنت مقيد في هذه السلسلة بالفعل"
     },
     {
       "id": "join_already_pending",
@@ -100,7 +100,7 @@
     {
       "id": "decision_block_not_reject",
       "detail": "Block enrolled students instead of rejecting.",
-      "ar": "الطالب منضم بالفعل — احظره بدلًا من رفض طلبه"
+      "ar": "الطالب مقيد بالفعل — احظره بدلًا من رفض طلبه"
     },
     {
       "id": "decision_unblock_before_reject",
@@ -488,12 +488,6 @@
       "framework": true
     },
     {
-      "id": "framework_server_error",
-      "detail": "Internal Server Error",
-      "ar": "خطأ في الخادم — حاول لاحقًا",
-      "framework": true
-    },
-    {
       "id": "validation_blank",
       "pattern": "^String should have at least 1 character",
       "sample": "String should have at least 1 character",
@@ -501,10 +495,16 @@
       "framework": true
     },
     {
+      "id": "validation_required",
+      "detail": "Field required",
+      "ar": "حقل مطلوب",
+      "framework": true
+    },
+    {
       "id": "validation_password_short",
       "pattern": "^String should have at least 8 characters",
       "sample": "String should have at least 8 characters",
-      "ar": "كلمة المرور 8 أحرف على الأقل",
+      "ar": "القيمة قصيرة — 8 أحرف على الأقل",
       "framework": true
     },
     {
@@ -523,9 +523,16 @@
     },
     {
       "id": "validation_not_positive",
-      "pattern": "^Input should be greater than \\d+$",
+      "pattern": "^Input should be greater than 0$",
       "sample": "Input should be greater than 0",
       "ar": "القيمة يجب أن تكون أكبر من صفر",
+      "framework": true
+    },
+    {
+      "id": "validation_above_min",
+      "pattern": "^Input should be greater than \\d+$",
+      "sample": "Input should be greater than 10",
+      "ar": "القيمة أكبر من الحد المسموح",
       "framework": true
     },
     {
@@ -537,14 +544,22 @@
     },
     {
       "id": "validation_uuid",
-      "detail": "Input should be a valid UUID",
       "ar": "قيمة غير صالحة",
-      "framework": true
+      "framework": true,
+      "pattern": "^Input should be a valid UUID",
+      "sample": "Input should be a valid UUID"
     },
     {
       "id": "validation_audio_only",
       "detail": "Input should be 'audio'",
       "ar": "نوع الملف غير مدعوم — التسجيل الصوتي فقط",
+      "framework": true
+    },
+    {
+      "id": "validation_literal_options",
+      "pattern": "^Input should be '",
+      "sample": "Input should be 'mcq', 'tf' or 'essay'",
+      "ar": "قيمة غير مدعومة",
       "framework": true
     },
     {

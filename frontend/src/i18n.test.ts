@@ -1,16 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { localizeDetail, localizeExamError, str } from './i18n'
+import { localizeDetail, localizeExamError, str, type CatalogEntry } from './i18n'
 import details from './i18n/details.json'
-
-type CatalogEntry = {
-  id: string
-  detail?: string
-  pattern?: string
-  sample?: string
-  ar: string | null
-  note?: string
-  framework?: boolean
-}
 
 const catalog = details.entries as CatalogEntry[]
 
@@ -167,6 +157,19 @@ describe('ticket 21 — the error-detail catalog', () => {
     expect(localizeDetail('String should have at least 1 character')).toMatch(/فارغًا/)
     expect(localizeDetail('String should have at least 8 characters')).toMatch(/8 أحرف/)
     expect(localizeDetail('Value error, Name must not be blank.')).toMatch(/الاسم/)
+  })
+
+  it('gives every 422 validation message its own copy', () => {
+    expect(localizeDetail('Field required')).toMatch(/مطلوب/)
+    expect(localizeDetail('String should have at most 200 characters')).toMatch(/أطول/)
+    expect(localizeDetail('Input should be greater than or equal to 0')).toMatch(/أقل/)
+    expect(localizeDetail('Input should be less than or equal to 1000')).toMatch(/أكبر/)
+    expect(localizeDetail('Input should be greater than 0')).toMatch(/أكبر من صفر/)
+    expect(localizeDetail('Input should be greater than 10')).toMatch(/الحد المسموح/)
+    expect(localizeDetail('Input should be a valid UUID, invalid character')).toMatch(/غير صالحة/)
+    expect(localizeDetail("Input should be 'mcq', 'tf' or 'essay'")).toMatch(/غير مدعومة/)
+    expect(localizeDetail("Input should be 'audio'")).toMatch(/التسجيل الصوتي/)
+    expect(localizeDetail('value is not a valid email address')).toMatch(/البريد/)
   })
 
   it('translates every validation message of a 422 (one per field)', () => {

@@ -10,7 +10,7 @@ import type {
   LessonSummaryOut,
   UploadUrlOut,
 } from '../api/types'
-import { localizeDetail, str } from '../i18n'
+import { detailById, localizeDetail, str } from '../i18n'
 import {
   MAX_ATTACHMENT_BYTES,
   courseHasBook,
@@ -206,9 +206,9 @@ function NewLessonForm({
         onSubmit={(e) => {
           e.preventDefault()
           if (pagesFrom && pagesTo && Number(pagesFrom) > Number(pagesTo)) {
-            // The backend's own wording, so the catalog translates it — no
-            // raw field names in the Arabic UI.
-            setErr(localizeDetail('pages_from must be <= pages_to.'))
+            // The catalog entry for the backend's own rule — no raw field
+            // names in the Arabic UI, and no copy of the backend wording here.
+            setErr(detailById('lesson_pages_order'))
             return
           }
           create.mutate()
