@@ -1,5 +1,6 @@
 // Arabic-first strings. Backend messages stay English; map them here.
 // RTL only — codes/numbers/timers use dir="ltr" inline in components.
+import details from './i18n/details.json'
 
 export const str = {
   appName: 'مجلس',
@@ -49,18 +50,10 @@ export const str = {
   citation: 'الاستشهاد',
   stubNote: 'واجهة تجريبية — تُفعّل بعد بناء الواجهة الخلفية',
   notFound: 'غير موجود (404)',
-  forbidden: 'لا صلاحية (403)',
-  unauthorized: 'سجّل الدخول أولًا (401)',
-  // Ticket 16 backend messages.
-  kindFixed: 'نوع السلسلة ثابت منذ الإنشاء — لا يمكن تغيير الكتاب',
-  pagesBookOnly: 'الصفحات لسلسلة الكتاب فقط',
-  badFormat: 'صيغة غير مدعومة — المسموح مذكور في الرسالة',
-  fileTooLarge: 'الملف كبير (أقصى 100MB) — يفضل ضغطه ثم إعادة المحاولة',
-  mainBookOnly: 'الكتاب الأساسي لسلسلة الكتاب فقط',
-  invalidCredentials: 'البريد أو كلمة المرور غير صحيحة — تحقق وحاول مجددًا',
-  unverifiedLogin: 'حسابك غير مفعّل — فعّله من الرابط في بريدك',
-  accountDisabled: 'الحساب موقوف — تواصل مع الإدارة',
-  emailRegistered: 'هذا البريد مسجل بالفعل — سجّل الدخول',
+  // The last resort when the backend sent something we do not know. It never
+  // says "try again": an unknown failure is not necessarily retryable, and a
+  // retry hint on a deterministic failure sends the user in circles.
+  unexpectedError: 'تعذّر إتمام الطلب',
   search: 'بحث',
   clearSearch: 'مسح البحث',
   noResults: 'لا نتائج مطابقة',
@@ -137,7 +130,6 @@ export const str = {
   noAttempts: 'لا توجد محاولات بعد',
   backToCourse: 'عودة إلى السلسلة',
   examNotFound: 'الاختبار غير موجود',
-  examNotEnrolled: 'لست مقيدًا في هذه السلسلة',
   examNoDescription: 'لا يوجد وصف لهذا الاختبار',
   loadingExam: 'جار تحميل الاختبار',
   resume: 'متابعة',
@@ -145,14 +137,12 @@ export const str = {
   startAttempt: 'بدء المحاولة',
   // Ticket 20: the states around the exam card.
   examLoadFailed: 'تعذّر تحميل الاختبار',
-  examWriterOnly: 'بدء المحاولة للطلاب فقط — المعلم يستخدم المعاينة',
   examNotOpenYet: 'لم يبدأ الاختبار بعد',
   examWindowClosed: 'انتهى وقت الاختبار',
   examStartFailed: 'تعذّر بدء المحاولة',
   examSubmitFailed: 'تعذّر التسليم',
   examAttemptsFailed: 'تعذّر تحميل المحاولات',
   examAutosaveFailed: 'تعذّر الحفظ التلقائي — ستُحفظ إجاباتك عند التسليم',
-  examLiveAttempt: 'لديك محاولة قيد الأداء',
   examScore: (score: number | string, max: number | string): string => `الدرجة ${score} / ${max}`,
   // Ticket 20: labels that used to be inline in the exam page.
   examDurationLabel: 'المدة',
@@ -171,42 +161,60 @@ export const str = {
   examTimeUp: 'انتهى وقت المحاولة — لم يعد التعديل ممكنًا',
 } as const
 
-// Backend English detail → Arabic UI message (pass-through fallback keeps English).
-const detailMap: Array<[RegExp, string]> = [
-  [/too many requests/i, str.tooMany],
-  [/incorrect email or password/i, str.invalidCredentials],
-  [/verify your email/i, str.unverifiedLogin],
-  [/account disabled/i, str.accountDisabled],
-  [/already registered/i, str.emailRegistered],
-  [/not authenticated|invalid.*token|expired/i, str.unauthorized],
-  [/not (a )?member|forbidden|not enrolled/i, str.forbidden],
-  [/not found/i, str.notFound],
-  [/keeps its book|cannot gain a book/i, str.kindFixed],
-  [/only allowed on book-based courses/i, str.pagesBookOnly],
-  [/attachments are supported/i, str.badFormat],
-  [/too large/i, str.fileTooLarge],
-  [/have a main book/i, str.mainBookOnly],
-  // Ticket 20: a second start is recovered from /attempts/me; this is the
-  // fallback shown only when no live attempt can be found.
-  [/already in progress/i, str.examLiveAttempt],
-  [/attempts limit reached/i, str.attemptsExhausted],
-  [/exam has not opened yet/i, str.examNotOpenYet],
-  [/exam window is closed/i, str.examWindowClosed],
-]
+// --- Error copy -------------------------------------------------------------
+//
+// The backend answers in English (AGENTS.md) and the UI shows Arabic. The
+// mapping lives in details.json: one entry per detail the backend can send,
+// carrying the Arabic the user reads. `ar: null` means the English passes
+// through on purpose, with a note saying why.
+//
+// details.json is the contract between the two packages:
+// backend/tests/test_error_details_contract.py fails when a service raises a
+// detail that has no entry here, so a new error can never ship untranslated.
 
-export function localizeDetail(detail: string): string {
-  for (const [re, ar] of detailMap) {
-    if (re.test(detail)) return ar
-  }
-  return 'تعذّر — حاول مجددًا'
+type CatalogEntry = {
+  id: string
+  detail?: string
+  pattern?: string
+  sample?: string
+  ar: string | null
+  note?: string
+  framework?: boolean
 }
 
-// Ticket 20: the exam seams answer in English and the SERVER knows who the
-// caller is, so the message is picked from the detail instead of re-deriving
-// the writer rule in the browser. A writer (ADR-0007) is told to use the
-// preview; anyone else is told they are not enrolled.
+const catalog = details.entries as CatalogEntry[]
+
+const matchers = catalog.map((entry) => ({
+  entry,
+  matches: entry.detail
+    ? (detail: string) => detail === entry.detail
+    : (detail: string) => new RegExp(entry.pattern as string).test(detail),
+}))
+
+function localizeOne(detail: string): string {
+  for (const { entry, matches } of matchers) {
+    if (matches(detail)) return entry.ar ?? detail
+  }
+  return str.unexpectedError
+}
+
+/**
+ * The Arabic message for a backend error detail.
+ *
+ * A 422 carries one validation message per field; the transport joins them
+ * with newlines and each is translated on its own.
+ */
+export function localizeDetail(detail: string): string {
+  const lines = detail.split('\n')
+  if (lines.length > 1) return lines.map(localizeOne).join('، ')
+  return localizeOne(detail)
+}
+
+// The exam seams answer in English and the SERVER knows who the caller is,
+// so the message is picked from the detail instead of re-deriving the writer
+// rule in the browser. A writer (ADR-0007) is told to use the preview; anyone
+// else is told they are not enrolled.
 export function localizeExamError(detail: string): string {
-  if (/only enrolled students may take/i.test(detail)) return str.examWriterOnly
-  if (/not enrolled in this course|not authorized/i.test(detail)) return str.examNotEnrolled
+  if (/not authorized/i.test(detail)) return localizeDetail('Not enrolled in this course.')
   return localizeDetail(detail)
 }

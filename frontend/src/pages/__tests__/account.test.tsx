@@ -57,15 +57,37 @@ describe('AccountPage', () => {
     expect(screen.queryByText('مفعّل')).toBeNull()
   })
 
-  it('language toggle flips to English + LTR', async () => {
+  it('language toggle flips the account page to English + LTR, and only it', async () => {
     renderAccount()
     fireEvent.click(screen.getByRole('button', { name: 'English' }))
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: 'My account' })).toBeInTheDocument()
     })
-    expect(document.documentElement.dir).toBe('ltr')
-    expect(document.documentElement.lang).toBe('en')
     expect(screen.getByRole('heading', { name: 'Sign out' })).toBeInTheDocument()
+
+    // The account page is LTR in English...
+    const main = screen.getByRole('main')
+    expect(main).toHaveAttribute('dir', 'ltr')
+    expect(main).toHaveAttribute('lang', 'en')
+
+    // ...but the document keeps its Arabic RTL direction, so the rest of the
+    // app cannot reflow (ticket 21).
+    expect(document.documentElement.dir).toBe('rtl')
+    expect(document.documentElement.lang).toBe('ar')
+  })
+
+  it('switching back to Arabic restores RTL on the account page', async () => {
+    renderAccount()
+    fireEvent.click(screen.getByRole('button', { name: 'English' }))
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'My account' })).toBeInTheDocument()
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'العربية' }))
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'حسابي' })).toBeInTheDocument()
+    })
+    expect(screen.getByRole('main')).toHaveAttribute('dir', 'rtl')
+    expect(document.documentElement.dir).toBe('rtl')
   })
 
   it('edits only the display name via PATCH /auth/me', async () => {

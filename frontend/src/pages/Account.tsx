@@ -12,7 +12,12 @@ import { useToast } from '../components/Toast'
 
 // Account pilot (ticket 18): the ONLY fully bilingual page so far (ar/en).
 // Every other page stays Arabic until the full-EN follow-up. Tables below
-// carry both languages; `lang` flips <html dir> via LangProvider.
+// carry both languages.
+//
+// The direction is scoped to this page (ticket 21): the account page renders
+// LTR in English and RTL in Arabic, while the document keeps its Arabic RTL
+// direction for the rest of the app — so choosing English here cannot reflow
+// the dashboard, the course, the lesson, the exam or the teacher pages.
 const T = {
   ar: {
     title: 'حسابي',
@@ -106,7 +111,11 @@ export function AccountPage() {
   }
 
   return (
-    <main className="mx-auto w-full max-w-2xl px-4 pt-28 sm:px-6">
+    <main
+      dir={lang === 'en' ? 'ltr' : 'rtl'}
+      lang={lang}
+      className="mx-auto w-full max-w-2xl px-4 pt-28 sm:px-6"
+    >
       <h1 className="font-heading text-2xl font-bold">{t.title}</h1>
 
       <section aria-label={t.profile} className="card arabesque mt-4 overflow-hidden rounded-2xl">

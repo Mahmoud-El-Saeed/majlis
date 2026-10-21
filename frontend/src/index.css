@@ -432,13 +432,14 @@ html.dark .zellige {
   left: 10px;
   transform: rotate(180deg);
 }
-/* LTR mirror (English pilot): corners follow the reading direction so the
-   flourish never sits on top of left-aligned labels. */
-html[dir="ltr"] .arabesque::before {
+/* LTR mirror: corners follow the reading direction so the flourish never
+   sits on top of left-aligned labels. The account page is the only LTR
+   subtree (ticket 21), so the rule keys off any LTR ancestor, not <html>. */
+[dir="ltr"] .arabesque::before {
   right: auto;
   left: 10px;
 }
-html[dir="ltr"] .arabesque::after {
+[dir="ltr"] .arabesque::after {
   left: auto;
   right: 10px;
 }

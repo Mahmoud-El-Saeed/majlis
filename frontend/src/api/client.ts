@@ -58,10 +58,25 @@ type ClientOpts = {
 
 type JsonBody = Record<string, unknown> | unknown[] | null
 
+type ValidationIssue = { msg?: unknown }
+
 async function parseDetail(res: Response): Promise<string> {
   try {
     const data = (await res.json()) as { detail?: unknown }
     if (typeof data?.detail === 'string') return data.detail
+    // A 422 lists one validation message per field instead of a single
+    // string. They are joined one per line so the catalog can translate
+    // each of them on its own.
+    if (Array.isArray(data?.detail)) {
+      const messages = data.detail
+        .map((issue) =>
+          typeof issue === 'object' && issue !== null
+            ? (issue as ValidationIssue).msg
+            : undefined,
+        )
+        .filter((msg): msg is string => typeof msg === 'string' && msg.length > 0)
+      if (messages.length > 0) return messages.join('\n')
+    }
     return `HTTP ${res.status}`
   } catch {
     return `HTTP ${res.status}`

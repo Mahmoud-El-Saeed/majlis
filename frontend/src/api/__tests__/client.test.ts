@@ -78,8 +78,38 @@ describe('api client transport', () => {
     }
   })
 
-  it('downloadCsv fetches blob with auth header', async () => {
-    const fetchMock = vi.fn(
+  it('a 422 detail list keeps every validation message, one per line', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        jsonResponse(
+          {
+            detail: [
+              { loc: ['body', 'password'], msg: 'String should have at least 8 characters' },
+              {
+                loc: ['body', 'email'],
+                msg: 'value is not a valid email address: An email address must have an @-sign.',
+              },
+            ],
+          },
+          422,
+        ),
+      ),
+    )
+    const client = createClient({ baseUrl: 'http://api.test/api/v1', onToast: () => {} })
+    try {
+      await client.post('/auth/signup', { email: 'x', password: 'short' })
+      expect.unreachable('should throw')
+    } catch (e) {
+      expect(e).toBeInstanceOf(ApiError)
+      const detail = (e as ApiError).detail
+      expect(detail.split('\n')).toHaveLength(2)
+      expect(detail).toMatch(/at least 8 characters/)
+      expect(detail).toMatch(/not a valid email address/)
+    }
+  })
+
+  it('downloadCsv fetches blob with auth header', async () => {    const fetchMock = vi.fn(
       async () =>
         new Response('a,b\n1,2', {
           status: 200,

@@ -2,9 +2,13 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 
 // Account-language pilot (ticket 18): Arabic-first app with an English
 // option. Only the account page (and its nav entry) is bilingual so far —
-// every other page stays Arabic until the full-EN follow-up. The choice
-// persists in localStorage and flips <html lang dir> (pre-paint script in
-// index.html prevents a direction flash on reload).
+// every other page stays Arabic until the full-EN follow-up.
+//
+// The choice is scoped (ticket 21): it never touches the document direction.
+// <html> stays Arabic RTL for the whole app, and the account page flips ITS
+// OWN direction, so picking English cannot reflow the dashboard, the course,
+// the lesson, the exam or the teacher pages. Because the document direction
+// never changes, a reload can never flash the wrong direction either.
 export type Lang = 'ar' | 'en'
 
 const KEY = 'mj_lang'
@@ -28,8 +32,6 @@ export function LangProvider({ children }: { children: ReactNode }) {
   const [lang, setLang] = useState<Lang>(initialLang)
 
   useEffect(() => {
-    document.documentElement.lang = lang
-    document.documentElement.dir = lang === 'ar' ? 'rtl' : 'ltr'
     try {
       localStorage.setItem(KEY, lang)
     } catch {

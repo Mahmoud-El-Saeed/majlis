@@ -1,0 +1,564 @@
+{
+  "$comment": [
+    "The error-detail contract between the backend and the frontend.",
+    "",
+    "The backend answers in English (AGENTS.md) and the frontend localizes the",
+    "detail here. backend/tests/test_error_details_contract.py reads this file",
+    "and fails when a service raises a detail with no entry — so a new error",
+    "string can never ship without Arabic copy.",
+    "",
+    "Entry shape:",
+    "  id       stable key, never shown to the user",
+    "  detail   the exact English detail the backend sends",
+    "  pattern  a regex for details that vary (interpolated numbers, Pydantic)",
+    "  sample   a concrete detail the pattern catches (required with pattern)",
+    "  ar       the Arabic message; null means the English passes through",
+    "  note     why the English passes through (required when ar is null)",
+    "  framework  true when the message comes from FastAPI/Pydantic, not our code",
+    "",
+    "Order is priority: the first entry that matches wins, so a broad pattern",
+    "must never sit above the specific entries it would shadow."
+  ],
+  "entries": [
+    {
+      "id": "code_max_active",
+      "pattern": "^Too many active codes for this course",
+      "sample": "Too many active codes for this course (max 5). Revoke an old code first.",
+      "ar": "بلغت الحد الأقصى للأكواد النشطة في هذه السلسلة — ألغِ كودًا قديمًا أولًا"
+    },
+    {
+      "id": "attachment_too_large",
+      "pattern": "^File is too large",
+      "sample": "File is too large (max 100MB). Please compress it and retry.",
+      "ar": "حجم الملف أكبر من الحد المسموح — اضغطه ثم أعد الرفع"
+    },
+    {
+      "id": "join_code_invalid",
+      "detail": "Invalid join code.",
+      "ar": "رمز السلسلة غير صحيح"
+    },
+    {
+      "id": "join_code_revoked",
+      "detail": "Join code revoked.",
+      "ar": "رُفض رمز السلسلة — أوقفه الشيخ"
+    },
+    {
+      "id": "join_code_expired",
+      "detail": "Join code expired.",
+      "ar": "انتهت صلاحية رمز السلسلة"
+    },
+    {
+      "id": "join_code_exhausted",
+      "detail": "Join code has no uses left.",
+      "ar": "استُهلك رمز السلسلة بالكامل — اطلب رمزًا جديدًا من الشيخ"
+    },
+    {
+      "id": "join_code_not_found",
+      "detail": "Join code not found.",
+      "ar": "رمز السلسلة غير موجود"
+    },
+    {
+      "id": "code_generate_failed",
+      "detail": "Could not generate a unique code. Try again.",
+      "ar": "تعذّر توليد رمز فريد — أعد المحاولة"
+    },
+    {
+      "id": "join_verify_email",
+      "detail": "Please verify your email before joining a course.",
+      "ar": "فعّل بريدك أولًا حتى تتمكن من الانضمام إلى السلسلة"
+    },
+    {
+      "id": "join_blocked",
+      "detail": "You are blocked from this course and cannot rejoin.",
+      "ar": "أنت محظور من هذه السلسلة ولا يمكنك الانضمام إليها مجددًا"
+    },
+    {
+      "id": "join_already_enrolled",
+      "detail": "Already enrolled in this course.",
+      "ar": "أنت منضم إلى هذه السلسلة بالفعل"
+    },
+    {
+      "id": "join_already_pending",
+      "detail": "Join request already pending review.",
+      "ar": "طلب انضمامك ما زال قيد المراجعة"
+    },
+    {
+      "id": "enrollment_not_found",
+      "detail": "Enrollment not found.",
+      "ar": "طلب الانضمام غير موجود"
+    },
+    {
+      "id": "decision_reapply",
+      "detail": "Rejected requests must re-apply with a new code.",
+      "ar": "الطلب مرفوض — قدّم طلبًا جديدًا برمز جديد"
+    },
+    {
+      "id": "decision_unblock_before_approve",
+      "detail": "Unblock this student before approving.",
+      "ar": "ارفع الحظر عن الطالب قبل قبول الطلب"
+    },
+    {
+      "id": "decision_block_not_reject",
+      "detail": "Block enrolled students instead of rejecting.",
+      "ar": "الطالب منضم بالفعل — احظره بدلًا من رفض طلبه"
+    },
+    {
+      "id": "decision_unblock_before_reject",
+      "detail": "Unblock this student before rejecting.",
+      "ar": "ارفع الحظر عن الطالب قبل رفض الطلب"
+    },
+    {
+      "id": "decision_not_blocked",
+      "detail": "Enrollment is not blocked.",
+      "ar": "هذا الطلب ليس محظورًا"
+    },
+    {
+      "id": "decision_unknown",
+      "detail": "Unknown decision.",
+      "ar": null,
+      "note": "internal: the decision route accepts four fixed actions only"
+    },
+    {
+      "id": "invite_teacher_exists",
+      "detail": "Teacher account already exists.",
+      "ar": "يوجد حساب معلم مسجّل بهذا البريد بالفعل"
+    },
+    {
+      "id": "invite_invalid",
+      "detail": "Invalid invite link.",
+      "ar": "رابط الدعوة غير صالح"
+    },
+    {
+      "id": "invite_used",
+      "detail": "Invite link already used.",
+      "ar": "استُخدم رابط الدعوة من قبل"
+    },
+    {
+      "id": "invite_revoked",
+      "detail": "Invite link revoked.",
+      "ar": "أُلغي رابط الدعوة"
+    },
+    {
+      "id": "invite_expired",
+      "detail": "Invite link expired.",
+      "ar": "انتهت صلاحية رابط الدعوة"
+    },
+    {
+      "id": "invite_send_failed",
+      "detail": "Failed to send invite email.",
+      "ar": "تعذّر إرسال بريد الدعوة"
+    },
+    {
+      "id": "auth_bad_credentials",
+      "detail": "Incorrect email or password.",
+      "ar": "البريد الإلكتروني أو كلمة المرور غير صحيحة"
+    },
+    {
+      "id": "auth_unverified_login",
+      "detail": "Please verify your email before logging in.",
+      "ar": "لم تُفعّل بريدك بعد — فعّل الحساب من الرابط المرسل إليك"
+    },
+    {
+      "id": "auth_account_disabled",
+      "detail": "Account disabled.",
+      "ar": "الحساب موقوف — تواصل مع الإدارة"
+    },
+    {
+      "id": "auth_session_expired",
+      "detail": "Session expired. Please log in again.",
+      "ar": "انتهت الجلسة — سجّل الدخول مجددًا"
+    },
+    {
+      "id": "auth_session_invalid",
+      "detail": "Could not validate session.",
+      "ar": "تعذّر التحقق من الجلسة — سجّل الدخول مجددًا"
+    },
+    {
+      "id": "auth_activation_link",
+      "detail": "Invalid or expired activation link.",
+      "ar": "رابط التفعيل غير صالح أو منتهي الصلاحية"
+    },
+    {
+      "id": "auth_reset_link",
+      "detail": "Invalid or expired reset link.",
+      "ar": "رابط استعادة كلمة المرور غير صالح أو منتهي الصلاحية"
+    },
+    {
+      "id": "auth_email_registered",
+      "detail": "Email already registered.",
+      "ar": "هذا البريد مسجّل بالفعل — سجّل الدخول"
+    },
+    {
+      "id": "auth_activation_email_failed",
+      "detail": "Failed to send activation email.",
+      "ar": "تعذّر إرسال بريد التفعيل — أعد التسجيل"
+    },
+    {
+      "id": "rate_limited",
+      "detail": "Too many requests. Try again in a minute.",
+      "ar": "طلبات كثيرة — انتظر دقيقة ثم أعد المحاولة"
+    },
+    {
+      "id": "admin_only",
+      "detail": "Admin access required.",
+      "ar": "هذه الصفحة للمدير فقط"
+    },
+    {
+      "id": "not_authorized",
+      "detail": "Not authorized.",
+      "ar": "لا تملك صلاحية للقيام بذلك"
+    },
+    {
+      "id": "course_not_found",
+      "detail": "Course not found.",
+      "ar": "السلسلة غير موجودة"
+    },
+    {
+      "id": "course_keeps_book",
+      "detail": "A book-based course keeps its book.",
+      "ar": "سلسلة الكتاب تحتفظ باسم كتابها"
+    },
+    {
+      "id": "course_cannot_gain_book",
+      "detail": "A general course cannot gain a book.",
+      "ar": "السلسلة العامة لا يمكن أن تأخذ كتابًا"
+    },
+    {
+      "id": "course_owner_not_found",
+      "detail": "Owner account not found.",
+      "ar": "حساب المالك غير موجود"
+    },
+    {
+      "id": "lesson_not_found",
+      "detail": "Lesson not found.",
+      "ar": "الدرس غير موجود"
+    },
+    {
+      "id": "lesson_audio_only",
+      "detail": "Only audio lessons are supported in V1.",
+      "ar": "التسجيل الصوتي فقط مدعوم في هذه النسخة"
+    },
+    {
+      "id": "lesson_pages_order",
+      "detail": "pages_from must be <= pages_to.",
+      "ar": "صفحة البداية يجب أن تسبق صفحة النهاية"
+    },
+    {
+      "id": "lesson_pages_book_only",
+      "detail": "Pages range is only allowed on book-based courses.",
+      "ar": "نطاق الصفحات متاح في سلسلة الكتاب فقط"
+    },
+    {
+      "id": "attachment_not_found",
+      "detail": "Attachment not found.",
+      "ar": "المرفق غير موجود"
+    },
+    {
+      "id": "attachment_types_lesson",
+      "detail": "Only PDF, PNG, JPEG, and WEBP attachments are supported.",
+      "ar": "المرفقات المسموحة: PDF أو PNG أو JPEG أو WEBP"
+    },
+    {
+      "id": "attachment_types_course",
+      "detail": "Only PDF attachments are supported.",
+      "ar": "المرفقات المسموحة: PDF فقط"
+    },
+    {
+      "id": "upload_missing",
+      "detail": "Upload not found. Retry with a fresh upload URL.",
+      "ar": "لم يُعثر على الملف المرفوع — اطلب رابط رفع جديدًا"
+    },
+    {
+      "id": "attachment_not_ready",
+      "detail": "Attachment file is not ready yet.",
+      "ar": "ملف المرفق لم يجهز بعد"
+    },
+    {
+      "id": "lesson_audio_not_ready",
+      "detail": "Lesson audio is not ready yet.",
+      "ar": "ملف تسجيل الدرس لم يجهز بعد"
+    },
+    {
+      "id": "upload_audio_only",
+      "detail": "Only audio uploads are supported in V1.",
+      "ar": "رفع الملفات الصوتية فقط مدعوم في هذه النسخة"
+    },
+    {
+      "id": "main_book_course_only",
+      "detail": "Only book-based courses have a main book.",
+      "ar": "الكتاب الأساسي متاح في سلسلة الكتاب فقط"
+    },
+    {
+      "id": "exam_not_found",
+      "detail": "Exam not found.",
+      "ar": "الاختبار غير موجود"
+    },
+    {
+      "id": "exam_window_order",
+      "detail": "open_at must be before close_at.",
+      "ar": "موعد الفتح يجب أن يسبق موعد الإغلاق"
+    },
+    {
+      "id": "exam_lesson_mismatch",
+      "detail": "Lesson does not belong to this course.",
+      "ar": "الدرس لا ينتمي إلى هذه السلسلة"
+    },
+    {
+      "id": "exam_title_blank",
+      "detail": "Title must not be blank.",
+      "ar": "العنوان لا يمكن أن يكون فارغًا"
+    },
+    {
+      "id": "question_max_score_positive",
+      "detail": "max_score must be positive.",
+      "ar": "الدرجة العظمى يجب أن تكون أكبر من صفر"
+    },
+    {
+      "id": "question_prompt_blank",
+      "detail": "Prompt must not be blank.",
+      "ar": "نص السؤال لا يمكن أن يكون فارغًا"
+    },
+    {
+      "id": "question_mcq_min_options",
+      "detail": "MCQ questions need at least 2 non-empty options.",
+      "ar": "سؤال الاختيار من متعدد يحتاج خيارين على الأقل"
+    },
+    {
+      "id": "question_mcq_needs_correct_index",
+      "detail": "MCQ questions need correct_index.",
+      "ar": "سؤال الاختيار من متعدد يحتاج تحديد الإجابة الصحيحة"
+    },
+    {
+      "id": "question_mcq_index_out_of_range",
+      "detail": "MCQ correct_index out of range.",
+      "ar": "رقم الإجابة الصحيحة خارج نطاق الخيارات"
+    },
+    {
+      "id": "question_mcq_no_correct_answer",
+      "detail": "MCQ questions must not set correct_answer.",
+      "ar": "لا يمكن تحديد إجابة صحيحة في سؤال الاختيار من متعدد"
+    },
+    {
+      "id": "question_tf_needs_correct_answer",
+      "detail": "True/False questions need correct_answer.",
+      "ar": "سؤال صح أو خطأ يحتاج تحديد الإجابة الصحيحة"
+    },
+    {
+      "id": "question_tf_no_options",
+      "detail": "True/False questions must not set options.",
+      "ar": "سؤال صح أو خطأ لا يقبل خيارات"
+    },
+    {
+      "id": "question_tf_no_correct_index",
+      "detail": "True/False questions must not set correct_index.",
+      "ar": "سؤال صح أو خطأ لا يقبل رقم الإجابة الصحيحة"
+    },
+    {
+      "id": "question_essay_needs_max_score",
+      "detail": "Essay questions need max_score.",
+      "ar": "السؤال المقالي يحتاج درجة عظمى"
+    },
+    {
+      "id": "question_essay_no_options",
+      "detail": "Essay questions must not set options.",
+      "ar": "السؤال المقالي لا يقبل خيارات"
+    },
+    {
+      "id": "question_essay_no_correct_answer",
+      "detail": "Essay questions must not set a correct answer.",
+      "ar": "السؤال المقالي لا يقبل إجابة صحيحة محددة"
+    },
+    {
+      "id": "question_type_unknown",
+      "detail": "Unknown question type.",
+      "ar": null,
+      "note": "internal: the request schema restricts the question type"
+    },
+    {
+      "id": "question_not_found",
+      "detail": "Question not found.",
+      "ar": "السؤال غير موجود"
+    },
+    {
+      "id": "attempts_limit_reached",
+      "detail": "Attempts limit reached.",
+      "ar": "نفدت محاولاتك في هذا الاختبار"
+    },
+    {
+      "id": "attempt_in_progress",
+      "detail": "An attempt is already in progress.",
+      "ar": "لديك محاولة قيد الأداء — أكملها قبل بدء محاولة جديدة"
+    },
+    {
+      "id": "attempt_already_submitted",
+      "detail": "Attempt already submitted.",
+      "ar": "تم تسليم هذه المحاولة بالفعل"
+    },
+    {
+      "id": "attempt_not_found",
+      "detail": "Attempt not found.",
+      "ar": "المحاولة غير موجودة"
+    },
+    {
+      "id": "answer_duplicate",
+      "detail": "Duplicate answer for question.",
+      "ar": "تكرّرت إجابة السؤال نفسه"
+    },
+    {
+      "id": "answer_unknown_question",
+      "detail": "Unknown question.",
+      "ar": "سؤال غير معروف"
+    },
+    {
+      "id": "exam_students_only",
+      "detail": "Only enrolled students may take exams.",
+      "ar": "بدء المحاولة للطلاب فقط — المعلم يستخدم المعاينة"
+    },
+    {
+      "id": "exam_not_enrolled",
+      "detail": "Not enrolled in this course.",
+      "ar": "لست مقيدًا في هذه السلسلة"
+    },
+    {
+      "id": "exam_verify_email",
+      "detail": "Please verify your email before taking exams.",
+      "ar": "فعّل بريدك أولًا قبل أداء الاختبارات"
+    },
+    {
+      "id": "exam_not_open",
+      "detail": "Exam has not opened yet.",
+      "ar": "لم يبدأ الاختبار بعد — عد لاحقًا"
+    },
+    {
+      "id": "exam_window_closed",
+      "detail": "Exam window is closed.",
+      "ar": "انتهى وقت الاختبار — لم يعد بدء المحاولة ممكنًا"
+    },
+    {
+      "id": "grade_not_submitted",
+      "detail": "Only submitted attempts can be graded.",
+      "ar": "تصحيح المحاولات المسلَّمة فقط"
+    },
+    {
+      "id": "grade_essay_only",
+      "detail": "Only essay answers can be graded manually.",
+      "ar": "التصحيح اليدوي متاح لإجابات الأسئلة المقالية فقط"
+    },
+    {
+      "id": "grade_feedback_blank",
+      "detail": "feedback must not be blank.",
+      "ar": "ملاحظة المعلم لا يمكن أن تكون فارغة"
+    },
+    {
+      "id": "grade_score_over_max",
+      "detail": "awarded_score must not exceed max_score.",
+      "ar": "الدرجة الممنوحة لا تتجاوز الدرجة العظمى"
+    },
+    {
+      "id": "publish_not_submitted",
+      "detail": "Only submitted attempts can be published.",
+      "ar": "نشر المحاولات المسلَّمة فقط"
+    },
+    {
+      "id": "publish_immediate",
+      "detail": "Exam publishes immediately; no manual publish needed.",
+      "ar": "نتائج هذا الاختبار تُنشر فور التسليم — لا حاجة للنشر اليدوي"
+    },
+    {
+      "id": "answer_not_found",
+      "detail": "Answer not found.",
+      "ar": "الإجابة غير موجودة"
+    },
+    {
+      "id": "framework_not_authenticated",
+      "detail": "Not authenticated",
+      "ar": "سجّل الدخول أولًا",
+      "framework": true
+    },
+    {
+      "id": "framework_not_found",
+      "detail": "Not Found",
+      "ar": "الصفحة غير موجودة",
+      "framework": true
+    },
+    {
+      "id": "framework_method_not_allowed",
+      "detail": "Method Not Allowed",
+      "ar": "طريقة الطلب غير مسموحة",
+      "framework": true
+    },
+    {
+      "id": "framework_server_error",
+      "detail": "Internal Server Error",
+      "ar": "خطأ في الخادم — حاول لاحقًا",
+      "framework": true
+    },
+    {
+      "id": "validation_blank",
+      "pattern": "^String should have at least 1 character",
+      "sample": "String should have at least 1 character",
+      "ar": "لا يمكن ترك الحقل فارغًا",
+      "framework": true
+    },
+    {
+      "id": "validation_password_short",
+      "pattern": "^String should have at least 8 characters",
+      "sample": "String should have at least 8 characters",
+      "ar": "كلمة المرور 8 أحرف على الأقل",
+      "framework": true
+    },
+    {
+      "id": "validation_too_long",
+      "pattern": "^String should have at most \\d+ characters",
+      "sample": "String should have at most 200 characters",
+      "ar": "الحقل أطول من المسموح",
+      "framework": true
+    },
+    {
+      "id": "validation_too_small",
+      "pattern": "^Input should be greater than or equal to \\d+$",
+      "sample": "Input should be greater than or equal to 1",
+      "ar": "القيمة أقل من الحد المسموح",
+      "framework": true
+    },
+    {
+      "id": "validation_not_positive",
+      "pattern": "^Input should be greater than \\d+$",
+      "sample": "Input should be greater than 0",
+      "ar": "القيمة يجب أن تكون أكبر من صفر",
+      "framework": true
+    },
+    {
+      "id": "validation_too_big",
+      "pattern": "^Input should be less than or equal to \\d+$",
+      "sample": "Input should be less than or equal to 1000",
+      "ar": "القيمة أكبر من الحد المسموح",
+      "framework": true
+    },
+    {
+      "id": "validation_uuid",
+      "detail": "Input should be a valid UUID",
+      "ar": "قيمة غير صالحة",
+      "framework": true
+    },
+    {
+      "id": "validation_audio_only",
+      "detail": "Input should be 'audio'",
+      "ar": "نوع الملف غير مدعوم — التسجيل الصوتي فقط",
+      "framework": true
+    },
+    {
+      "id": "validation_email",
+      "pattern": "^value is not a valid email address",
+      "sample": "value is not a valid email address: An email address must have an @-sign.",
+      "ar": "صيغة البريد الإلكتروني غير صحيحة",
+      "framework": true
+    },
+    {
+      "id": "validation_blank_name",
+      "detail": "Value error, Name must not be blank.",
+      "ar": "الاسم لا يمكن أن يكون فارغًا",
+      "framework": true
+    }
+  ]
+}

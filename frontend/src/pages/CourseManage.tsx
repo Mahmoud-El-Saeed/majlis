@@ -206,7 +206,9 @@ function NewLessonForm({
         onSubmit={(e) => {
           e.preventDefault()
           if (pagesFrom && pagesTo && Number(pagesFrom) > Number(pagesTo)) {
-            setErr('pages_from يجب أن تكون ≤ pages_to')
+            // The backend's own wording, so the catalog translates it — no
+            // raw field names in the Arabic UI.
+            setErr(localizeDetail('pages_from must be <= pages_to.'))
             return
           }
           create.mutate()

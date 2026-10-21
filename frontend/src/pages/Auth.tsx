@@ -182,7 +182,6 @@ export function SignupPage() {
               const msg = ex instanceof ApiError ? localizeDetail(ex.detail) : 'خطأ'
               setErr(msg)
               if (ex instanceof ApiError && ex.status === 429) toast(msg)
-              if (ex instanceof ApiError && ex.status === 502) setErr('تعذّر إرسال البريد — أعد المحاولة')
             }
           }}
         >
