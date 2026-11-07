@@ -25,7 +25,7 @@ TEST_DATABASE_URL = os.getenv(
 )
 
 
-async def _flush_rate_limits() -> None:
+async def flush_rate_limits() -> None:
     """Isolate rate-limit counters between tests.
 
     Counts persist in real Redis across runs (60s TTL); the memory
@@ -46,7 +46,7 @@ async def _flush_rate_limits() -> None:
 
 @pytest_asyncio.fixture
 async def client(monkeypatch: pytest.MonkeyPatch) -> AsyncGenerator[AsyncClient]:
-    await _flush_rate_limits()
+    await flush_rate_limits()
     engine = create_async_engine(TEST_DATABASE_URL, future=True)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
@@ -90,7 +90,7 @@ async def client(monkeypatch: pytest.MonkeyPatch) -> AsyncGenerator[AsyncClient]
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
-    await _flush_rate_limits()
+    await flush_rate_limits()
     await engine.dispose()
 
 

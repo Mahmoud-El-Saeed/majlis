@@ -1,4 +1,5 @@
 import uuid
+from collections.abc import Iterable
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -25,6 +26,17 @@ class CourseRepository:
             return []
         result = await db.execute(select(Course).where(Course.id.in_(course_ids)))
         return list(result.scalars().all())
+
+    async def titles_for(
+        self, db: AsyncSession, course_ids: Iterable[uuid.UUID]
+    ) -> dict[uuid.UUID, str]:
+        """Batched id → title map for enrollment reads (ticket 22): every
+        enrollment read names its course without one query per row."""
+        ids = set(course_ids)
+        if not ids:
+            return {}
+        result = await db.execute(select(Course.id, Course.title).where(Course.id.in_(ids)))
+        return {course_id: title for course_id, title in result.all()}
 
     async def save(self, db: AsyncSession, course: Course) -> Course:
         db.add(course)

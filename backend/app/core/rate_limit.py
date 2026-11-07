@@ -6,6 +6,12 @@ authenticated-or-token reads and are deliberately NOT limited.
 Falls back to in-memory when Redis is unreachable (tests / local without
 redis) and logs a warning instead of failing silently.
 Backend messages stay English; the frontend localizes them (default Arabic).
+
+Ticket 22: buckets are keyed on the real client. With
+RATE_LIMIT_TRUSTED_PROXIES > 0 the rightmost N entries of X-Forwarded-For
+name the trusted proxies (Cloudflare, then nginx); the bucket keys on the
+rightmost entry before them. 0 keeps the raw TCP peer (dev, direct access),
+which was exactly the shared-bucket bug behind the reverse proxy.
 """
 
 import logging
@@ -47,6 +53,31 @@ LIMITED_ENDPOINTS: dict[str, int] = {
 }
 
 
+def client_key(request: Request) -> str:
+    """Bucket key identity for one request.
+
+    Trusted-proxy walk: each trusted proxy appends the peer it saw to
+    X-Forwarded-For; the rightmost `RATE_LIMIT_TRUSTED_PROXIES` entries are
+    therefore trusted proxy chains, and the entry before them is the client
+    as the innermost trusted proxy saw it. XFF shorter than that walks the
+    chain back to the leftmost entry (a no-forgery client behind the proxy).
+    No header → direct peer (dev, no proxy in front).
+    """
+    direct = request.client.host if request.client else "unknown"
+    hops = settings.RATE_LIMIT_TRUSTED_PROXIES
+    if hops <= 0:
+        return direct
+    xff = request.headers.get("x-forwarded-for")
+    if not xff:
+        return direct
+    chain = [part.strip() for part in xff.split(",") if part.strip()]
+    if not chain:
+        return direct
+    trusted_cut = max(len(chain) - hops, 0)
+    untrusted = chain[:trusted_cut]
+    return untrusted[-1] if untrusted else chain[0]
+
+
 async def _memory_allowed(key: str, limit: int, window: int = 60) -> bool:
     now = time.time()
     hits = [t for t in _memory_hits[key] if now - t < window]
@@ -69,7 +100,7 @@ async def rate_limit_middleware(
     if limit is None or request.method != "POST":
         return await call_next(request)
 
-    client = request.client.host if request.client else "unknown"
+    client = client_key(request)
     key = f"rl:{request.url.path}:{client}"
 
     allowed = True

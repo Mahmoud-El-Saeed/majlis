@@ -314,10 +314,8 @@ async def list_code_uses(
 
 async def my_enrollments(db: AsyncSession, user: User) -> list[tuple[Enrollment, str]]:
     """All of the caller's enrollments across courses with course titles, so
-    one account joining N courses sees every pending/approved state."""
+    one account joining N courses sees every pending/approved state.
+    One batched id→title query instead of one per row."""
     rows = await enrollment_repository.list_for_user(db, user.id)
-    out: list[tuple[Enrollment, str]] = []
-    for row in rows:
-        course = await course_repository.get_by_id(db, str(row.course_id))
-        out.append((row, course.title if course else ""))
-    return out
+    titles = await course_repository.titles_for(db, (row.course_id for row in rows))
+    return [(row, titles.get(row.course_id, "")) for row in rows]

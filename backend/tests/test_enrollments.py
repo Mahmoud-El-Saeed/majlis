@@ -525,3 +525,37 @@ async def test_teacher_joining_other_course_uses_same_gate(client: AsyncClient):
     eid = j.json()["id"]
     assert (await client.post(f"/api/v1/enrollments/{eid}/approve", headers=th1)).status_code == 200
     assert (await client.get(f"/api/v1/courses/{cid}", headers=tbh)).status_code == 200
+
+
+async def test_enrollment_reads_carry_the_course_title(client: AsyncClient):
+    """Ticket 22: every enrollment read names its course — join response,
+    my-enrollment, teacher queue and approval decisions included, not just
+    the /mine listing."""
+    _, th, cid = await _teacher_with_course(client, "titl@x.com")
+    made = await _make_code(client, th, cid, {})
+    toks, sh = await _student(client, "titl-st@x.com")
+
+    join = await client.post(
+        "/api/v1/enrollments/join",
+        json={"code": made["code"], "display_name": "S"},
+        headers=sh,
+    )
+    assert join.status_code == 201, join.text
+    assert join.json()["course_title"] == "Fiqh Book", join.json()
+
+    my_enr = await client.get(f"/api/v1/courses/{cid}/my-enrollment", headers=sh)
+    assert my_enr.status_code == 200, my_enr.text
+    assert my_enr.json()["course_title"] == "Fiqh Book", my_enr.json()
+
+    queue = await client.get(f"/api/v1/courses/{cid}/enrollments?status=pending", headers=th)
+    assert queue.status_code == 200, queue.text
+    assert queue.json()["enrollments"][0]["course_title"] == "Fiqh Book", queue.json()
+
+    approve = await client.post(f"/api/v1/enrollments/{join.json()['id']}/approve", headers=th)
+    assert approve.status_code == 200, approve.text
+    assert approve.json()["course_title"] == "Fiqh Book", approve.json()
+
+    dash = await client.get("/api/v1/dashboard", headers=sh)
+    assert dash.status_code == 200, dash.text
+    item = next(i for i in dash.json()["items"] if i["course"]["id"] == cid)
+    assert item["enrollment"]["course_title"] == "Fiqh Book", item["enrollment"]

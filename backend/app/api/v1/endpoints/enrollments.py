@@ -3,7 +3,8 @@ from typing import Annotated
 from fastapi import APIRouter, HTTPException, Query, status
 
 from app.api.dependencies import CurrentUserDep, DbDep
-from app.models.enrollment import EnrollmentStatus
+from app.models.enrollment import Enrollment, EnrollmentStatus
+from app.repositories.course_repository import course_repository
 from app.schemas.codes import (
     CodeCreateIn,
     CodeListOut,
@@ -42,6 +43,18 @@ def _not_found(e: EnrollmentError | CourseError) -> HTTPException:
 
 def _forbidden(e: EnrollmentError | CourseError) -> HTTPException:
     return HTTPException(status_code=403, detail=e.message)
+
+
+async def _page_out(db: DbDep, rows: list[Enrollment]) -> list[EnrollmentOut]:
+    """Enrollment reads carry the course title (ticket 22): one batched
+    id→title query covers the whole page."""
+    titles = await course_repository.titles_for(db, (r.course_id for r in rows))
+    return [to_enrollment_out(r, titles.get(r.course_id)) for r in rows]
+
+
+async def _row_out(db: DbDep, row: Enrollment) -> EnrollmentOut:
+    """Single-row flavour of `_page_out` (join, my-enrollment, decisions)."""
+    return (await _page_out(db, [row]))[0]
 
 
 @router.post(
@@ -111,7 +124,7 @@ async def join_with_code(db: DbDep, user: CurrentUserDep, data: JoinIn) -> Enrol
         raise HTTPException(status_code=403, detail=e.message) from None
     except EnrollmentError as e:
         raise HTTPException(status_code=400, detail=e.message) from None
-    return to_enrollment_out(row)
+    return await _row_out(db, row)
 
 
 @router.get("/enrollments/mine", response_model=EnrollmentListOut)
@@ -135,7 +148,7 @@ async def list_enrollments(
         raise _not_found(e) from None
     except _FORBIDDEN as e:
         raise _forbidden(e) from None
-    return EnrollmentListOut(enrollments=[to_enrollment_out(r) for r in rows])
+    return EnrollmentListOut(enrollments=await _page_out(db, rows))
 
 
 @router.get("/courses/{course_id}/my-enrollment", response_model=EnrollmentOut | None)
@@ -146,7 +159,7 @@ async def my_enrollment(db: DbDep, user: CurrentUserDep, course_id: str) -> Enro
         raise HTTPException(status_code=404, detail=e.message) from None
     if row is None:
         return None
-    return to_enrollment_out(row)
+    return await _row_out(db, row)
 
 
 async def _decide(
@@ -160,7 +173,7 @@ async def _decide(
         raise _forbidden(e) from None
     except EnrollmentError as e:
         raise HTTPException(status_code=400, detail=e.message) from None
-    return to_enrollment_out(row)
+    return await _row_out(db, row)
 
 
 @router.post("/enrollments/{enrollment_id}/approve", response_model=EnrollmentOut)

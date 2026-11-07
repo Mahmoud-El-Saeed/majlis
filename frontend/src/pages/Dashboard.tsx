@@ -13,6 +13,7 @@ import { useToast } from '../components/Toast'
 import { Fab } from '../components/Fab'
 import { Modal } from '../components/Modal'
 import { EnrollmentBadge } from '../components/Badges'
+import { enrollmentStatusHint } from '../components/EnrollmentStatusCard'
 import { NumberBadge } from '../components/NumberBadge'
 import { SearchBox } from '../components/SearchBox'
 import { StarDivider } from '../components/Star8'
@@ -24,20 +25,26 @@ export function JoinBox({ onJoined }: { onJoined: () => void }) {
   const { user } = useAuth()
   const [code, setCode] = useState('')
   const [displayName, setDisplayName] = useState('')
+  const [phone, setPhone] = useState('')
+  const [note, setNote] = useState('')
   const [err, setErr] = useState<string | null>(null)
   // The account already carries the display name (set at signup, editable in
   // /account) — ask for it only when the account has none yet.
   const accountName = user?.full_name?.trim() || ''
   const effectiveName = accountName || displayName.trim()
 
+  // Ticket 22: collect the optional contact details the API already accepts
+  // (phone + note). Empty strings are omitted so the backend stores null.
   const join = useMutation({
-    mutationFn: (body: { code: string; display_name: string }) =>
+    mutationFn: (body: { code: string; display_name: string; phone?: string; note?: string }) =>
       api.post('/enrollments/join', body),
     onSuccess: () => {
       setCode('')
+      setPhone('')
+      setNote('')
       setErr(null)
       onJoined()
-      toast('تم إرسال طلب الانضمام — بانتظار المراجعة')
+      toast(str.joinToastSuccess)
     },
     onError: (e) => {
       const msg = e instanceof ApiError ? localizeDetail(e.detail) : 'تعذّر الانضمام'
@@ -56,7 +63,14 @@ export function JoinBox({ onJoined }: { onJoined: () => void }) {
           return
         }
         setErr(null)
-        join.mutate({ code: code.trim(), display_name: effectiveName })
+        const ph = phone.trim()
+        const nt = note.trim()
+        join.mutate({
+          code: code.trim(),
+          display_name: effectiveName,
+          ...(ph !== '' ? { phone: ph } : {}),
+          ...(nt !== '' ? { note: nt } : {}),
+        })
       }}
     >
       <label className="mb-2 block">
@@ -89,6 +103,28 @@ export function JoinBox({ onJoined }: { onJoined: () => void }) {
           )
         </p>
       )}
+      <label className="mb-2 block">
+        <span className="mb-1 block text-sm">{str.joinPhoneLabel}</span>
+        <input
+          value={phone}
+          onChange={(e) => setPhone(e.target.value)}
+          dir="ltr"
+          placeholder={str.joinPhonePlaceholder}
+          className={fieldCls}
+          style={fieldStyle}
+        />
+      </label>
+      <label className="mb-3 block">
+        <span className="mb-1 block text-sm">{str.joinNoteLabel}</span>
+        <textarea
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          placeholder={str.joinNotePlaceholder}
+          rows={2}
+          className={fieldCls}
+          style={fieldStyle}
+        />
+      </label>
         {err && (
           <p role="alert" className="mb-2 text-sm" style={{ color: 'var(--secondary)' }}>
             {err}
@@ -175,9 +211,6 @@ export function DashboardPage() {
                     </span>
                   )}
                 </div>
-                {it.enrollment && it.enrollment_status === 'pending' && (
-                  <p className="muted-t mt-2 text-sm">{str.pendingWait}</p>
-                )}
                 {canViewContent(it.enrollment_status) ? (
                   <Link
                     to={`/courses/${it.course.id}`}
@@ -186,7 +219,14 @@ export function DashboardPage() {
                     دخول السلسلة
                   </Link>
                 ) : (
-                  <p className="muted-t mt-3 text-sm">أدخلت رمزًا؟ انتظر مراجعة الشيخ.</p>
+                  it.enrollment && (
+                    /* Ticket 22: one hint source for the dashboard and the
+                       status page — blocked never passes for "awaiting
+                       review". */
+                    <p className="muted-t mt-3 text-sm">
+                      {enrollmentStatusHint(it.enrollment.status)}
+                    </p>
+                  )
                 )}
               </li>
             ))}

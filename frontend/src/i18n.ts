@@ -19,7 +19,6 @@ export const str = {
   joinPlaceholder: 'أدخل رمز السلسلة',
   join: 'انضم',
   myCourses: 'سلاسلي',
-  pendingWait: 'طلبك بانتظار مراجعة الشيخ',
   lessons: 'الدروس',
   exams: 'الاختبارات',
   lessonExam: 'اختبار الدرس',
@@ -157,6 +156,23 @@ export const str = {
   examConfirmSubmit: 'تأكيد التسليم',
   examTimeLeft: 'الوقت المتبقي',
   examTimeUp: 'انتهى وقت المحاولة — لم يعد التعديل ممكنًا',
+  // Ticket 22: per-enrollment status hints (dashboard cards + the dedicated
+  // direct-navigation status page). Blocked never passes for "awaiting
+  // review", and rejected points at re-applying with a new code.
+  enrollmentPendingHint: 'طلبك بانتظار مراجعة الشيخ — ستصلك النتيجة عند القبول.',
+  enrollmentRejectedHint: 'طلبك مرفوض — يمكنك التقديم مجددًا برمز جديد من لوحتك.',
+  enrollmentBlockedHint: 'تم حظرك من هذه السلسلة؛ لا يمكنك إعادة الانضمام إليها.',
+  goToDashboard: 'إلى لوحتك',
+  // Ticket 22: the direct-route membership check failing is surfaced, never
+  // a silent 403 — explicit card, retry button.
+  enrollmentCheckFailed: 'تعذّر التحقق من انتسابك لهذه السلسلة',
+  // Ticket 22: the join form now collects the optional contact details the
+  // API already accepts (phone + note), beside the name-when-none rule.
+  joinPhoneLabel: 'الهاتف (اختياري)',
+  joinPhonePlaceholder: 'مثال: 0551234567',
+  joinNoteLabel: 'ملاحظة للشيخ (اختياري)',
+  joinNotePlaceholder: 'اكتب ما يلزمني معرفته — أي اجتماع متوقع أو سؤال',
+  joinToastSuccess: 'تم إرسال طلب الانضمام — بانتظار المراجعة',
 } as const
 
 // --- Error copy -------------------------------------------------------------

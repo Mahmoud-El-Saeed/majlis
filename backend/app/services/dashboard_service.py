@@ -32,13 +32,12 @@ async def get_dashboard(db: AsyncSession, user: User) -> DashboardOut:
         seen.add(cid)
         row = by_course_id.get(cid)
         lesson_counts = counts.get(cid, {"total": 0, "ready": 0})
+        enrollment_out = to_enrollment_out(row, course.title) if row else None
         if can_write(user, course):
             status = "owner" if course.created_by == user.id else "admin"
-            enrollment_out = to_enrollment_out(row) if row else None
             lesson_count = lesson_counts["total"]
         else:
             status = row.status.value if row is not None else EnrollmentStatus.approved.value
-            enrollment_out = to_enrollment_out(row) if row else None
             # Approved students see ready counts only: draft (non-ready)
             # lessons are not content and must not leak via totals.
             lesson_count = lesson_counts["ready"]
@@ -69,7 +68,7 @@ async def get_dashboard(db: AsyncSession, user: User) -> DashboardOut:
             DashboardItem(
                 course=to_course_out(course),
                 enrollment_status=row.status.value,
-                enrollment=to_enrollment_out(row),
+                enrollment=to_enrollment_out(row, course.title),
                 lesson_count=0,
                 ready_count=0,
             )

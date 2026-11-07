@@ -35,7 +35,20 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
 
 
 def create_app() -> FastAPI:
-    app = FastAPI(title="Majlis API", version="0.1.0", lifespan=lifespan)
+    # Ticket 22 (ADR-0009): the interactive API contract (/docs, /redoc,
+    # /openapi.json) is a development surface. In production it is disabled
+    # so the route/permission map is not published to the internet.
+    if settings.APP_ENV == "prod":
+        app = FastAPI(
+            title="Majlis API",
+            version="0.1.0",
+            lifespan=lifespan,
+            docs_url=None,
+            redoc_url=None,
+            openapi_url=None,
+        )
+    else:
+        app = FastAPI(title="Majlis API", version="0.1.0", lifespan=lifespan)
     app.middleware("http")(rate_limit_middleware)
     app.add_middleware(
         CORSMiddleware,

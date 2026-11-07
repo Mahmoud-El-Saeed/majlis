@@ -8,8 +8,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 import app.services.admin_seed as seed_module
 from app.core.config import Settings
+from app.core.database import Base
 from app.models.user import Role
 from app.services.admin_seed import ensure_admin_seed
+from tests.conftest import TEST_DATABASE_URL
 from tests.helpers import open_db_session
 
 
@@ -22,9 +24,22 @@ def fileless_settings(monkeypatch: pytest.MonkeyPatch) -> None:
 
 @pytest_asyncio.fixture
 async def db() -> AsyncGenerator[AsyncSession]:
-    async with open_db_session() as session:
-        yield session
-        await session.rollback()
+    """Fresh schema per test so this file also passes on a virgin
+    `majlis_test` (it runs before any `client` fixture has created tables);
+    the schema is dropped again so the DB is left as we found it."""
+    from sqlalchemy.ext.asyncio import create_async_engine
+
+    engine = create_async_engine(TEST_DATABASE_URL, future=True)
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    try:
+        async with open_db_session() as session:
+            yield session
+            await session.rollback()
+    finally:
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.drop_all)
+        await engine.dispose()
 
 
 async def test_seed_noop_without_env(

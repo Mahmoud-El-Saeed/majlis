@@ -18,6 +18,7 @@ import { hasAnswerLeak, isScoreVisible } from '../features/exams/helpers'
 import { str } from '../i18n'
 import { AudioPlayer } from '../components/AudioPlayer'
 import { LessonBadge, WindowBadge } from '../components/Badges'
+import { EnrollmentStatusCard, type GatedStatus } from '../components/EnrollmentStatusCard'
 import { NumberBadge } from '../components/NumberBadge'
 import { SearchBox } from '../components/SearchBox'
 import { Skeleton } from '../components/Skeleton'
@@ -27,25 +28,43 @@ import lessonCover from '../assets/lesson-cover.svg'
 
 export function CoursePage() {
   const { id = '' } = useParams()
-  const course = useQuery({ queryKey: ['course', id], queryFn: () => api.get<CourseOut>(`/courses/${id}`) })
-  const lessons = useQuery({
-    queryKey: ['lessons', id],
-    queryFn: () => api.get<LessonSummaryOut[]>(`/courses/${id}/lessons`),
-  })
   const myEnrollment = useQuery({
     queryKey: ['my-enrollment', id],
     // 200 null when never joined; 404 only unknown course.
     queryFn: () => api.get<EnrollmentOut | null>(`/courses/${id}/my-enrollment`),
     retry: false,
   })
+
+  const status = myEnrollment.data === null ? null : (myEnrollment.data?.status ?? null)
+  const canView = myEnrollment.data === null ? false : canViewContent(status ?? undefined)
+  // Pending/rejected/blocked: a dedicated status page — no tabs, no counts,
+  // no content. Content reads stay disabled until the membership check
+  // allows them, so a gated student never fires (or silently swallows) the
+  // content endpoints' 403s at all. Never-joined keeps the existing card.
+  const gatedStatus: GatedStatus | null =
+    status === 'pending' || status === 'rejected' || status === 'blocked' ? status : null
+  const contentEnabled = myEnrollment.isSuccess && gatedStatus === null
+
+  const course = useQuery({
+    queryKey: ['course', id],
+    queryFn: () => api.get<CourseOut>(`/courses/${id}`),
+    enabled: contentEnabled,
+  })
+  const lessons = useQuery({
+    queryKey: ['lessons', id],
+    queryFn: () => api.get<LessonSummaryOut[]>(`/courses/${id}/lessons`),
+    enabled: contentEnabled,
+  })
   const studentExams = useQuery({
     queryKey: ['student-exams', id],
     queryFn: () => api.get<StudentExamOut[]>(`/courses/${id}/student-exams`),
     retry: false,
+    enabled: contentEnabled,
   })
 
-  const status = myEnrollment.data === null ? null : (myEnrollment.data?.status ?? null)
-  const canView = myEnrollment.data === null ? false : canViewContent(status ?? undefined)
+  // Ticket 22: the enrollment read carries the course title, so a gated
+  // student still sees which series they were measured against.
+  const title = course.data?.title ?? myEnrollment.data?.course_title ?? null
   // Ticket 16: no pages line anywhere for general courses (legacy stored
   // pages stay hidden too).
   const showPages = course.data ? courseHasBook(course.data) : false
@@ -75,10 +94,36 @@ export function CoursePage() {
     examsByLesson.set(row.exam.lesson_id, rows)
   }
 
+  if (gatedStatus) {
+    return (
+      <main className="mx-auto w-full max-w-3xl px-4 pt-28 sm:px-6">
+        {title && (
+          <h1 dir="auto" className="font-heading text-3xl font-bold">
+            {title}
+          </h1>
+        )}
+        <StarDivider />
+        <EnrollmentStatusCard status={gatedStatus} />
+      </main>
+    )
+  }
+
   return (
     <main className="mx-auto w-full max-w-6xl px-4 pt-28 sm:px-6 lg:px-8">
       {course.data && <h1 className="font-heading text-3xl font-bold">{course.data.title}</h1>}
       <StarDivider />
+      {myEnrollment.isError && (
+        <div className="card mt-4 rounded-2xl p-4 text-center" role="alert">
+          <p>{str.enrollmentCheckFailed}</p>
+          <button
+            type="button"
+            onClick={() => myEnrollment.refetch()}
+            className="btn-secondary transition-ui mt-3 rounded-xl px-4 py-1.5 text-sm"
+          >
+            {str.retry}
+          </button>
+        </div>
+      )}
       {myEnrollment.data === null && (
         <div className="card mt-4 rounded-2xl p-4">
           <p>لم تنضم بعد — استخدم صندوق الانضمام في لوحتك.</p>

@@ -1,8 +1,15 @@
+from typing import Literal
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+
+    # Ticket 22 (ADR-0009): "prod" disables /docs, /redoc and /openapi.json —
+    # the interactive route map is a development surface only. Compose sets
+    # APP_ENV=prod; everything else (tests, local uvicorn) stays "dev".
+    APP_ENV: Literal["dev", "prod"] = "dev"
 
     DATABASE_URL: str = "postgresql+asyncpg://majlis:majlis@localhost:5432/majlis"
     REDIS_URL: str = "redis://localhost:6379/0"
@@ -21,6 +28,12 @@ class Settings(BaseSettings):
     RATE_LIMIT_RESET_PER_MIN: int = 5
     RATE_LIMIT_INVITE_PER_MIN: int = 10
     RATE_LIMIT_JOIN_PER_MIN: int = 10
+    # Ticket 22: number of trusted reverse proxies in front of the API.
+    # 0 (default, dev/direct) = key buckets on the raw TCP peer. N > 0 = the
+    # rightmost N entries of X-Forwarded-For are trusted proxies; the bucket
+    # keys on the rightmost entry BEFORE them, so one client's exhausted
+    # bucket never denies another client behind the same proxy.
+    RATE_LIMIT_TRUSTED_PROXIES: int = 0
     INVITE_TOKEN_EXPIRE_HOURS: int = 72
     CODE_DEFAULT_LENGTH: int = 8
     CODE_DEFAULT_EXPIRE_DAYS: int = 7

@@ -52,6 +52,14 @@ services:
     environment:
       DATABASE_URL: postgresql+asyncpg://majlis:majlis@postgres:5432/majlis
       REDIS_URL: redis://redis:6379/0
+      # Ticket 22 (ADR-0009): compose is the production unit — the interactive
+      # API contract (/docs, /redoc, /openapi.json) is disabled by default.
+      # Override APP_ENV=dev only for a temporary compose-run smoke check.
+      APP_ENV: ${APP_ENV:-prod}
+      # Ticket 22 (ADR-0011): one trusted proxy (nginx; Cloudflare in front)
+      # marshals X-Forwarded-For, and rate-limit buckets key on the real
+      # client it reports instead of on the proxy's own address.
+      RATE_LIMIT_TRUSTED_PROXIES: ${RATE_LIMIT_TRUSTED_PROXIES:-1}
       # Secrets and identity come from the shell environment (or an
       # `infra/.env` file, gitignored) — never hardcoded here. Dev defaults
       # below are insecure placeholders for local-only runs.
