@@ -6,8 +6,9 @@ Status: accepted
 
 The reverse proxy (nginx) forwarded requests verbatim and stamped no
 response headers. An audit finding (ticket 22) asked for baseline security
-headers. TLS terminates at Cloudflare in front of this proxy, and this host
-serves only the JSON API — the SPA lives on Cloudflare Pages, not here.
+headers. TLS terminates at Cloudflare in front of this proxy. This host
+serves the JSON API and, since the frontend container landed, the SPA under
+`/` — each location gets the CSP its content needs.
 
 ## Decision
 
@@ -31,8 +32,10 @@ terminator (Cloudflare `Strict Transport-Security`).
   five repeated inside the `location /` text response — nginx's `add_header`
   inheritance drops server-level headers the moment a location defines its
   own `add_header`, so the repetition is load-bearing, not redundant.
-- If the SPA ever moves under this proxy, revisit CSP (`none` would be
-  wrong for a real frontend) before serving HTML from here.
+- The SPA is served under this proxy too: `/api/` and `/health` keep the
+  JSON-only `default-src 'none'` CSP, while `location /` stamps a
+  `default-src 'self'` policy that allows the bundle, bundled fonts, inline
+  style attributes, R2 audio playback and presigned uploads.
 
 ## Rejected alternatives
 

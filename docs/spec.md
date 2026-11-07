@@ -71,7 +71,7 @@ Modules and interfaces:
 - Chat contract: per-course collection, chunk approx 800 tokens / 150 overlap over transcript_voice + transcript_book with metadata lesson/pages; prompt enforces Arabic-first, sources-only, cite lesson title, refuse otherwise; per-student daily quota + response cache.
 - Key vault: provider/model/encrypted key/weight/active/quota/last_used stored in Postgres encrypted at rest, decrypt only in worker memory, rotation by least-recently-used skipping 429/5xx, full usage log with tokens/latency/error, Redis caches rotation pointer for speed. Master encryption key only secret in env.
 - API style: async FastAPI, async Postgres access, Alembic migrations, JWT short access + long refresh. Arabic-first error messages where user-facing.
-- Deployment: Docker Compose services api + postgres + qdrant + worker + redis + reverse-proxy; frontend static build served via Cloudflare Pages (fallback static via Nginx). Single R2 bucket private.
+- Deployment: Docker Compose services api + frontend + postgres + qdrant + worker + redis + reverse-proxy; the frontend is a static build served by its own nginx container behind the reverse proxy. Single R2 bucket private.
 - Rejected vs blocked semantics: rejected = soft, may re-apply with new code; blocked = per-course ban, cannot rejoin that course; platform ban admin-only.
 - Lesson upload in V1 admin-only; teacher-upload is V2 to bound scope.
 

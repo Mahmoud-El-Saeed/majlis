@@ -9,8 +9,8 @@ flowchart LR
     Student([Student browser]) --> CF[Cloudflare<br/>TLS + CDN]
     Teacher([Teacher browser]) --> CF
     Admin([Admin]) --> CF
-    CF --> Pages[Cloudflare Pages<br/>React 19.3 static frontend]
     CF --> Proxy[Nginx reverse-proxy<br/>VPS]
+    Proxy --> FE[Frontend nginx<br/>React 19.3 static build]
     Proxy --> API[FastAPI async API]
     API --> PG[(Postgres 18.6<br/>metadata + transcripts + vault)]
     API --> QD[(Qdrant v1.19<br/>1 collection / course)]
@@ -24,7 +24,7 @@ Rules: browsers never touch R2/Postgres/Qdrant directly — every byte goes thro
 
 ## 2. Docker Compose topology (ticket 01)
 
-Services: `api`, `postgres`, `qdrant`, `redis`, `reverse-proxy`, plus `mailpit` as dev SMTP. No worker service (ADR-0001). Volumes only for database data; media lives in R2. Single private R2 bucket, prefix `courses/{course_id}/lessons/{lesson_id}/`.
+Services: `api`, `frontend`, `postgres`, `qdrant`, `redis`, `reverse-proxy`, plus `mailpit` as dev SMTP. No worker service (ADR-0001). Volumes only for database data; media lives in R2. Single private R2 bucket, prefix `courses/{course_id}/lessons/{lesson_id}/`.
 
 ## 3. Backend structure (per fastapi-templates skill)
 
@@ -54,7 +54,7 @@ backend/
 └── pyproject.toml           # uv + ruff config
 ```
 
-## 4. Frontend structure (React 19.3 + bun, Cloudflare Pages)
+## 4. Frontend structure (React 19.3 + bun, served by its own nginx container)
 
 ```
 frontend/
