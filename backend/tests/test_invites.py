@@ -257,3 +257,183 @@ async def test_invite_mail_failure_returns_502_and_leaves_no_invite(
     r = await client.get("/api/v1/invites", headers=admin_headers)
     assert r.status_code == 200
     assert all(i["email"] != "retry@example.com" for i in r.json()["invites"])
+
+
+async def _invite_id_for(
+    client: AsyncClient, admin_headers: dict[str, str], email: str
+) -> str:
+    r = await client.get("/api/v1/invites", headers=admin_headers)
+    assert r.status_code == 200, r.text
+    rows = [i for i in r.json()["invites"] if i["email"] == email]
+    assert len(rows) == 1, rows
+    return str(rows[0]["id"])
+
+
+async def test_invite_lookup_names_email_and_status_for_every_state(
+    client: AsyncClient, admin_headers: dict[str, str]
+) -> None:
+    """Ticket 23: the acceptance page can name the invited email and explain
+    why a non-active link cannot be used, before any form is shown."""
+    outbox = get_outbox(client)
+
+    await client.post(
+        "/api/v1/invites", json={"email": "lookup-active@example.com"}, headers=admin_headers
+    )
+    active_token = invite_link_for(outbox, "lookup-active@example.com")
+
+    await client.post(
+        "/api/v1/invites", json={"email": "lookup-used@example.com"}, headers=admin_headers
+    )
+    used_token = invite_link_for(outbox, "lookup-used@example.com")
+    r = await client.post(
+        "/api/v1/invites/accept", json={"token": used_token, "password": "secret1234"}
+    )
+    assert r.status_code == 201, r.text
+
+    await client.post(
+        "/api/v1/invites", json={"email": "lookup-revoked@example.com"}, headers=admin_headers
+    )
+    revoked_token = invite_link_for(outbox, "lookup-revoked@example.com")
+    await client.post(
+        "/api/v1/invites", json={"email": "lookup-revoked@example.com"}, headers=admin_headers
+    )
+
+    await client.post(
+        "/api/v1/invites", json={"email": "lookup-expired@example.com"}, headers=admin_headers
+    )
+    expired_token = invite_link_for(outbox, "lookup-expired@example.com")
+    await expire_invite_in_db("lookup-expired@example.com")
+
+    for token, email, expected_status in [
+        (active_token, "lookup-active@example.com", "active"),
+        (used_token, "lookup-used@example.com", "used"),
+        (revoked_token, "lookup-revoked@example.com", "revoked"),
+        (expired_token, "lookup-expired@example.com", "expired"),
+    ]:
+        r = await client.get("/api/v1/invites/lookup", params={"token": token})
+        assert r.status_code == 200, r.text
+        assert r.json() == {"email": email, "status": expected_status}
+
+    r = await client.get("/api/v1/invites/lookup", params={"token": "forged-token"})
+    assert r.status_code == 404, r.text
+    assert r.json()["detail"] == "Invalid invite link."
+
+
+async def test_invite_list_carries_derived_status(
+    client: AsyncClient, admin_headers: dict[str, str]
+) -> None:
+    """The admin list derives status once server-side so the UI never has to
+    recompute used/revoked/expired precedence (and cannot drift at the
+    expiry boundary)."""
+    outbox = get_outbox(client)
+    await client.post(
+        "/api/v1/invites", json={"email": "list-active@example.com"}, headers=admin_headers
+    )
+    await client.post(
+        "/api/v1/invites", json={"email": "list-used@example.com"}, headers=admin_headers
+    )
+    used_token = invite_link_for(outbox, "list-used@example.com")
+    r = await client.post(
+        "/api/v1/invites/accept", json={"token": used_token, "password": "secret1234"}
+    )
+    assert r.status_code == 201, r.text
+    await client.post(
+        "/api/v1/invites", json={"email": "list-revoked@example.com"}, headers=admin_headers
+    )
+    await client.post(
+        "/api/v1/invites", json={"email": "list-revoked@example.com"}, headers=admin_headers
+    )
+    await client.post(
+        "/api/v1/invites", json={"email": "list-expired@example.com"}, headers=admin_headers
+    )
+    await expire_invite_in_db("list-expired@example.com")
+
+    r = await client.get("/api/v1/invites", headers=admin_headers)
+    assert r.status_code == 200, r.text
+    statuses = {
+        i["email"]: i["status"]
+        for i in r.json()["invites"]
+        if i["email"].startswith("list-") and i["email"] != "list-revoked@example.com"
+    }
+    assert statuses == {
+        "list-active@example.com": "active",
+        "list-used@example.com": "used",
+        "list-expired@example.com": "expired",
+    }
+    revoked_statuses = [
+        i["status"] for i in r.json()["invites"] if i["email"] == "list-revoked@example.com"
+    ]
+    assert revoked_statuses == ["active", "revoked"]
+
+
+async def test_admin_can_revoke_unused_invite_and_accept_is_rejected(
+    client: AsyncClient, admin_headers: dict[str, str]
+) -> None:
+    outbox = get_outbox(client)
+    await client.post(
+        "/api/v1/invites", json={"email": "revoke-me@example.com"}, headers=admin_headers
+    )
+    token = invite_link_for(outbox, "revoke-me@example.com")
+    invite_id = await _invite_id_for(client, admin_headers, "revoke-me@example.com")
+
+    r = await client.post(f"/api/v1/invites/{invite_id}/revoke", headers=admin_headers)
+    assert r.status_code == 200, r.text
+    assert r.json()["id"] == invite_id
+    assert r.json()["email"] == "revoke-me@example.com"
+    assert r.json()["revoked_at"] is not None
+
+    lookup = await client.get("/api/v1/invites/lookup", params={"token": token})
+    assert lookup.status_code == 200, lookup.text
+    assert lookup.json() == {"email": "revoke-me@example.com", "status": "revoked"}
+
+    r = await client.post("/api/v1/invites/accept", json={"token": token, "password": "secret1234"})
+    assert r.status_code == 400, r.text
+    assert "revoked" in r.json()["detail"].lower()
+
+    # Revoke is idempotent and the revoked row stays in admin history.
+    again = await client.post(f"/api/v1/invites/{invite_id}/revoke", headers=admin_headers)
+    assert again.status_code == 200, again.text
+    assert again.json()["id"] == invite_id
+    rows = [
+        i
+        for i in (await client.get("/api/v1/invites", headers=admin_headers)).json()["invites"]
+        if i["email"] == "revoke-me@example.com"
+    ]
+    assert len(rows) == 1
+    assert rows[0]["revoked_at"] is not None
+
+
+async def test_admin_revoke_rejects_used_missing_and_non_admin(
+    client: AsyncClient, admin_headers: dict[str, str]
+) -> None:
+    outbox = get_outbox(client)
+    await client.post(
+        "/api/v1/invites", json={"email": "already-used@example.com"}, headers=admin_headers
+    )
+    token = invite_link_for(outbox, "already-used@example.com")
+    r = await client.post("/api/v1/invites/accept", json={"token": token, "password": "secret1234"})
+    assert r.status_code == 201, r.text
+    used_id = await _invite_id_for(client, admin_headers, "already-used@example.com")
+
+    r = await client.post(f"/api/v1/invites/{used_id}/revoke", headers=admin_headers)
+    assert r.status_code == 400, r.text
+    assert "used" in r.json()["detail"].lower()
+
+    r = await client.post(
+        "/api/v1/invites/00000000-0000-0000-0000-000000000000/revoke", headers=admin_headers
+    )
+    assert r.status_code == 404, r.text
+    assert r.json()["detail"] == "Invite not found."
+
+    await create_user_in_db("teacher@example.com", "secret1234", role=Role.teacher)
+    teacher_tokens = await login(client, "teacher@example.com", "secret1234")
+    teacher_headers = {"Authorization": f"Bearer {teacher_tokens['access_token']}"}
+    await client.post(
+        "/api/v1/invites", json={"email": "still-active@example.com"}, headers=admin_headers
+    )
+    active_id = await _invite_id_for(client, admin_headers, "still-active@example.com")
+
+    r = await client.post(f"/api/v1/invites/{active_id}/revoke", headers=teacher_headers)
+    assert r.status_code == 403, r.text
+    r = await client.post(f"/api/v1/invites/{active_id}/revoke")
+    assert r.status_code == 401, r.text

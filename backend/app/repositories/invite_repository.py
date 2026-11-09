@@ -1,3 +1,4 @@
+import uuid
 from datetime import UTC, datetime
 
 from sqlalchemy import select
@@ -7,6 +8,14 @@ from app.models.teacher_invite import TeacherInvite
 
 
 class InviteRepository:
+    async def get_by_id(self, db: AsyncSession, invite_id: str) -> TeacherInvite | None:
+        try:
+            iid = uuid.UUID(str(invite_id))
+        except ValueError:
+            return None
+        result = await db.execute(select(TeacherInvite).where(TeacherInvite.id == iid))
+        return result.scalars().first()
+
     async def get_by_token_hash(self, db: AsyncSession, token_hash: str) -> TeacherInvite | None:
         result = await db.execute(
             select(TeacherInvite).where(TeacherInvite.token_hash == token_hash)

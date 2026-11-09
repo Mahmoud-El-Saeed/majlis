@@ -882,11 +882,14 @@ export function GradebookPage() {
 
   const [query, setQuery] = useState('')
   const rows = (gradebook.data ?? []).filter((r) => r.exam_id === examId)
-  const visibleRows = rows.filter((r) => matchesArabic(r.student_email, query))
+  const visibleRows = rows.filter((r) => matchesArabic(`${r.student_name} ${r.student_email}`, query))
+  const examTitle = detail.data?.title ?? ''
 
   return (
     <main className="mx-auto w-full max-w-5xl px-4 pt-28 sm:px-6">
-      <h1 className="font-heading text-2xl font-bold">السجل</h1>
+      <h1 className="font-heading text-2xl font-bold">
+        {examTitle ? `سجل الدرجات: ${examTitle}` : 'سجل الدرجات'}
+      </h1>
       <p className="muted-t text-sm">MCQ/TF تُصحح تلقائيًا عند التسليم؛ المقالية تُصحح في صفحة مستقلة.</p>
       {cid && (
         <Link to={`/teach/courses/${cid}/exams`} className="underline text-sm">
@@ -950,7 +953,12 @@ export function GradebookPage() {
             )}
             {visibleRows.map((r) => (
               <tr key={r.attempt_id} className="border-t" style={{ borderColor: 'var(--border)' }}>
-                <td className="p-2" dir="ltr">{r.student_email}</td>
+                <td className="p-2">
+                  <span dir="auto" className="font-bold">{r.student_name}</span>
+                  {r.student_email !== r.student_name && (
+                    <span dir="ltr" className="muted-t block text-xs">{r.student_email}</span>
+                  )}
+                </td>
                 <td className="p-2" dir="ltr">{r.score ?? '—'} / {r.max_score}</td>
                 <td className="p-2">{r.status === 'submitted' ? 'مُسلّمة' : r.status}{r.is_late ? ' · متأخر' : ''}</td>
                 <td className="p-2">{r.is_published ? 'نعم' : 'لا'}</td>

@@ -386,10 +386,8 @@ export function LessonPage() {
                   return p.playback_url
                 }}
               />
-            ) : lesson.data.status === 'failed' ? (
-              <p>فشل تجهيز الدرس — سيعيد الشيخ رفعه.</p>
             ) : (
-              <p>الدرس قيد التجهيز…</p>
+              <p>{lesson.data.status === 'pending' ? 'الدرس بانتظار التجهيز…' : 'الدرس قيد التجهيز…'}</p>
             )}
           </div>
           <Attachments courseId={lesson.data.course_id} lessonId={id} />

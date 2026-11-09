@@ -215,4 +215,41 @@ describe('codes + queue page (wrapped list shapes)', () => {
     })
     expect(screen.queryByText(/DEAD/)).toBeNull()
   })
+
+  it('renders empty states as list items with valid list markup', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        const u = String(url)
+        if (u.endsWith('/courses/C1/codes')) {
+          return new Response(JSON.stringify({ codes: [] }), { status: 200 })
+        }
+        if (u.includes('/enrollments')) {
+          return new Response(JSON.stringify({ enrollments: [] }), { status: 200 })
+        }
+        return new Response(JSON.stringify({ detail: 'Not found' }), { status: 404 })
+      }),
+    )
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    render(
+      <QueryClientProvider client={qc}>
+        <ToastProvider>
+          <MemoryRouter initialEntries={['/teach/courses/C1/codes']}>
+            <Routes>
+              <Route path="/teach/courses/:id/codes" element={<CodesQueuePage />} />
+            </Routes>
+          </MemoryRouter>
+        </ToastProvider>
+      </QueryClientProvider>,
+    )
+    await waitFor(() => {
+      expect(screen.getByText('لا رموز بعد')).toBeInTheDocument()
+    })
+    for (const text of ['لا رموز بعد', 'لا طلبات معلقة', 'لا أعضاء بعد']) {
+      const el = screen.getByText(text)
+      expect(el.tagName).toBe('LI')
+      expect(el.closest('ul')).not.toBeNull()
+    }
+    expect(document.querySelectorAll('ul > p')).toHaveLength(0)
+  })
 })

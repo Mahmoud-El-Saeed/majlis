@@ -10,6 +10,9 @@ Contract under test:
 - Authz: writer gate (owner-teacher/admin) via can_write; other teacher/student 403, anon 401.
 """
 
+import csv
+import io
+
 from httpx import AsyncClient
 
 from app.models.user import Role
@@ -29,8 +32,8 @@ async def _teacher_with_course(client: AsyncClient, email: str = "grade_teacher@
     return t, h, r.json()["id"]
 
 
-async def _student(client: AsyncClient, email: str):
-    await create_user_in_db(email, "password123", role=Role.student)
+async def _student(client: AsyncClient, email: str, full_name: str | None = None):
+    await create_user_in_db(email, "password123", role=Role.student, full_name=full_name)
     toks = await _tokens(client, email)
     return toks, {"Authorization": f"Bearer {toks['access_token']}"}
 
@@ -604,3 +607,40 @@ async def test_writer_grades_after_read_and_student_sees_per_setting(client: Asy
     assert p.status_code == 200, p.text
     shown = await client.get(f"/api/v1/attempts/{aid}", headers=sh)
     assert shown.json()["score"] == 8
+
+
+async def test_gradebook_student_name_prefers_full_name_and_falls_back_to_email(
+    client: AsyncClient,
+):
+    """Ticket 23: gradebook rows use the account display name, falling back to
+    email when the account has no usable name; CSV carries the same identity."""
+    _, th, cid = await _teacher_with_course(client, "g23t@x.com")
+    _, named_h = await _student(client, "g23named@x.com", full_name="أحمد الطالب")
+    _, unnamed_h = await _student(client, "g23unnamed@x.com")
+    _, blank_h = await _student(client, "g23blank@x.com", full_name="   ")
+    await _enroll_approved(client, th, cid, named_h, name="older enrollment name")
+    await _enroll_approved(client, th, cid, unnamed_h, name="older enrollment name")
+    await _enroll_approved(client, th, cid, blank_h, name="older enrollment name")
+    exam = await _make_exam(
+        client, th, cid, title="اختبار الوحدة الأولى", show_result="immediate"
+    )
+    mcq = await _add_mcq(client, th, exam["id"], correct=2, max_score=4)
+    for headers in (named_h, unnamed_h, blank_h):
+        await _submit(
+            client, headers, exam["id"], [{"question_id": mcq["id"], "selected_index": 2}]
+        )
+
+    gb = await client.get(f"/api/v1/courses/{cid}/gradebook", headers=th)
+    assert gb.status_code == 200, gb.text
+    names = {r["student_email"]: r["student_name"] for r in gb.json()}
+    assert names == {
+        "g23named@x.com": "أحمد الطالب",
+        "g23unnamed@x.com": "g23unnamed@x.com",
+        "g23blank@x.com": "g23blank@x.com",
+    }
+
+    exported = await client.get(f"/api/v1/courses/{cid}/gradebook/export", headers=th)
+    assert exported.status_code == 200, exported.text
+    rows = list(csv.DictReader(io.StringIO(exported.text)))
+    assert "student_name" in rows[0]
+    assert {r["student_email"]: r["student_name"] for r in rows} == names

@@ -144,6 +144,11 @@
       "ar": "انتهت صلاحية رابط الدعوة"
     },
     {
+      "id": "invite_not_found",
+      "detail": "Invite not found.",
+      "ar": "لم تُعثر على الدعوة"
+    },
+    {
       "id": "invite_send_failed",
       "detail": "Failed to send invite email.",
       "ar": "تعذّر إرسال بريد الدعوة"

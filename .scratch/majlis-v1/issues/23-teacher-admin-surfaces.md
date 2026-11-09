@@ -12,3 +12,7 @@
 - [ ] The invite acceptance page displays the invited email before the form.
 - [ ] An admin can revoke an unused invite; revoked and expired links cannot be accepted and explain why in Arabic; used/revoked history stays visible.
 - [ ] Backend projection/endpoint tests and frontend rendering tests cover the fallback, badge states, and revoke path.
+
+## Comments
+
+- **2026-11-09 — "unused" means active (agent, post-review):** The revoke line is read as *unused = active*. An expired-but-unused invite cannot be revoked: the endpoint answers 400 `Invite link expired.` and the admin UI offers the button on `active` rows only. Rationale: an expired link is already un-acceptable, so revoking it adds nothing and overwrites expired history with revoked, blurring the audit trail. Same for used (`Invite link already used.`), while revoking an already-revoked invite is an idempotent 200. Covered by `backend/tests/test_invites.py` and the idempotency case there.

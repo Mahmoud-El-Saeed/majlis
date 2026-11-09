@@ -10,13 +10,13 @@ export function EnrollmentBadge({ status }: { status: EnrollmentStatus }) {
 }
 
 const lessonAr: Record<LessonStatus, string> = {
-  ready: 'جاهز',
+  pending: 'بانتظار',
   processing: 'يُجهّز',
-  failed: 'فشل',
+  ready: 'جاهز',
 }
 
 export function LessonBadge({ status }: { status: LessonStatus }) {
-  const cls = status === 'ready' ? 'badge-primary' : status === 'failed' ? 'badge-secondary' : 'badge-primary'
+  const cls = status === 'ready' ? 'badge-primary' : 'badge-secondary'
   return (
     <span className={`${cls} transition-ui inline-flex items-center rounded-full px-3 py-1 text-xs font-bold`}>
       {lessonAr[status]}

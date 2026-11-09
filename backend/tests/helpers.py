@@ -31,6 +31,7 @@ async def create_user_in_db(
     password: str,
     role: Role = Role.student,
     verified: bool = True,
+    full_name: str | None = None,
 ) -> str:
     """Insert a user straight into the test DB. Returns the user id."""
     from app.core.security import get_password_hash
@@ -42,6 +43,7 @@ async def create_user_in_db(
             hashed_password=get_password_hash(password),
             role=role,
             is_verified=verified,
+            full_name=full_name,
         )
         session.add(user)
         await session.commit()

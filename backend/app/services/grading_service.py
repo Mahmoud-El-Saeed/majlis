@@ -167,6 +167,9 @@ async def gradebook_for_course(
         answers = await attempt_answer_repository.list_for_attempt(db, attempt.id)
         questions_by_id = {str(q.id): q for q in questions}
         email = student.email if student is not None else ""
+        student_name = (student.full_name or "").strip() if student is not None else ""
+        if not student_name:
+            student_name = email
         row_answers: list[GradebookAnswerOut] = []
         for a in sorted(answers, key=lambda r: str(r.question_id)):
             question = questions_by_id.get(str(a.question_id))
@@ -190,6 +193,7 @@ async def gradebook_for_course(
                 exam_title=exam.title,
                 student_id=str(attempt.student_id),
                 student_email=email,
+                student_name=student_name,
                 status=enum_str(attempt.status),
                 score=attempt.score,
                 max_score=attempt.max_score,
@@ -204,6 +208,7 @@ async def gradebook_for_course(
 
 CSV_HEADER = [
     "student_email",
+    "student_name",
     "exam_title",
     "attempt_id",
     "exam_id",
@@ -237,6 +242,7 @@ def build_gradebook_csv(rows: list[GradebookRowOut]) -> str:
     for row in rows:
         totals_prefix = [
             row.student_email,
+            row.student_name,
             row.exam_title,
             row.attempt_id,
             row.exam_id,

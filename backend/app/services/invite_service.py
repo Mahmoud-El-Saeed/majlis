@@ -12,6 +12,7 @@ from app.models.teacher_invite import TeacherInvite
 from app.models.user import Role, User
 from app.repositories.invite_repository import invite_repository
 from app.repositories.user_repository import user_repository
+from app.schemas.invites import InviteStatus
 
 
 class InviteError(Exception):
@@ -23,6 +24,10 @@ class InviteError(Exception):
 
 class InviteTransportError(InviteError):
     """The invite email could not be sent; nothing was persisted (safe to retry)."""
+
+
+class InviteNotFound(InviteError):
+    """The referenced invite (or invite link) does not exist."""
 
 
 def hash_token(raw_token: str) -> str:
@@ -105,6 +110,43 @@ async def accept_invite(db: AsyncSession, token: str, password: str, full_name: 
     invite.used_at = datetime.now(UTC)
     await db.flush()
     return user
+
+
+def invite_status(invite: TeacherInvite) -> InviteStatus:
+    """Display state for an invite, in the same precedence accept enforces."""
+    if invite.used_at is not None:
+        return "used"
+    if invite.revoked_at is not None:
+        return "revoked"
+    if invite.expires_at <= datetime.now(UTC):
+        return "expired"
+    return "active"
+
+
+async def lookup_invite(db: AsyncSession, token: str) -> TeacherInvite:
+    """Resolve an invite link for the acceptance page (email + status only)."""
+    invite = await invite_repository.get_by_token_hash(db, hash_token(token.strip()))
+    if invite is None:
+        raise InviteNotFound("Invalid invite link.")
+    return invite
+
+
+async def revoke_invite(db: AsyncSession, invite_id: str) -> TeacherInvite:
+    """Admin-revoke an unused invite. Already-revoked is a no-op so a retry
+    after a lost response does not fail; used/expired rows stay rejected."""
+    invite = await invite_repository.get_by_id(db, invite_id)
+    if invite is None:
+        raise InviteNotFound("Invite not found.")
+    if invite.used_at is not None:
+        raise InviteError("Invite link already used.")
+    if invite.revoked_at is not None:
+        return invite
+    if invite.expires_at <= datetime.now(UTC):
+        raise InviteError("Invite link expired.")
+    invite.revoked_at = datetime.now(UTC)
+    await db.flush()
+    await db.refresh(invite)
+    return invite
 
 
 async def list_invites(db: AsyncSession) -> list[TeacherInvite]:

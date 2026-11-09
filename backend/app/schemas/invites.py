@@ -1,6 +1,9 @@
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
+
+InviteStatus = Literal["active", "used", "revoked", "expired"]
 
 
 class InviteCreateIn(BaseModel):
@@ -24,6 +27,7 @@ class InviteListItem(BaseModel):
 
     id: str
     email: str
+    status: InviteStatus
     expires_at: datetime
     used_at: datetime | None = None
     revoked_at: datetime | None = None
@@ -32,3 +36,14 @@ class InviteListItem(BaseModel):
 
 class InviteListOut(BaseModel):
     invites: list[InviteListItem]
+
+
+class InviteLookupOut(BaseModel):
+    email: str
+    status: InviteStatus
+
+
+class InviteRevokeOut(BaseModel):
+    id: str
+    email: str
+    revoked_at: datetime

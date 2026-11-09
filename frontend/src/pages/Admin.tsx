@@ -4,8 +4,9 @@ import { ApiError } from '../api/client'
 import { api } from '../api/http'
 import type { CourseOut, InviteOut, LessonOut } from '../api/types'
 import { courseHasBook } from '../features/courses/helpers'
-import { localizeDetail, str } from '../i18n'
+import { inviteStatusAr, localizeDetail, str } from '../i18n'
 import { useToast } from '../components/Toast'
+import { ConfirmDialog } from '../components/ConfirmDialog'
 import { Fab } from '../components/Fab'
 import { Modal } from '../components/Modal'
 import { btnPrimary, fieldCls, fieldStyle } from './Auth'
@@ -21,11 +22,35 @@ function normalizeInvites(data: InviteList | undefined): InviteOut[] {
 export function AdminPage() {
   const [showInvite, setShowInvite] = useState(false)
   const [showLesson, setShowLesson] = useState(false)
+  const [confirmInvite, setConfirmInvite] = useState<InviteOut | null>(null)
+  const [confirmBusy, setConfirmBusy] = useState(false)
+  const qc = useQueryClient()
+  const { toast } = useToast()
 
   const invites = useQuery({
     queryKey: ['invites'],
     queryFn: () => api.get<InviteList>('/invites'),
   })
+
+  const revoke = useMutation({
+    mutationFn: (inviteId: string) => api.post(`/invites/${inviteId}/revoke`, {}),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['invites'] })
+      setConfirmInvite(null)
+      toast('أُلغيت الدعوة')
+    },
+    onError: (e) => toast(e instanceof ApiError ? localizeDetail(e.detail) : 'تعذّر إلغاء الدعوة'),
+  })
+
+  const runRevoke = async () => {
+    if (!confirmInvite) return
+    setConfirmBusy(true)
+    try {
+      await revoke.mutateAsync(confirmInvite.id)
+    } finally {
+      setConfirmBusy(false)
+    }
+  }
 
   return (
     <main className="mx-auto w-full max-w-5xl px-4 pt-28 sm:px-6">
@@ -33,14 +58,27 @@ export function AdminPage() {
       <div className="card arabesque mt-4 rounded-2xl p-5">
         <h2 className="font-heading mb-2 font-bold">دعوات المعلمين (بدون تسجيل عام)</h2>
         <ul className="mt-3 grid gap-2 text-sm">
-          {normalizeInvites(invites.data).map((inv) => (
-            <li key={inv.id} className="flex justify-between gap-2 rounded-xl border px-3 py-2" style={{ borderColor: 'var(--border)' }}>
-              <span dir="ltr">{inv.email}</span>
-              <span className="muted-t" dir="ltr">
-                {inv.used_at ? 'مستخدمة' : inv.revoked_at ? 'ملغاة' : 'بانتظار القبول'}
-              </span>
-            </li>
-          ))}
+          {normalizeInvites(invites.data).map((inv) => {
+            const status = inv.status
+            return (
+              <li key={inv.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border px-3 py-2" style={{ borderColor: 'var(--border)' }}>
+                <span dir="ltr">{inv.email}</span>
+                <span className="flex items-center gap-2">
+                  <span className="muted-t">{inviteStatusAr[status]}</span>
+                  {status === 'active' && (
+                    <button
+                      type="button"
+                      onClick={() => setConfirmInvite(inv)}
+                      className="transition-ui clickable rounded-lg border px-3 py-1"
+                      style={{ borderColor: 'var(--secondary)' }}
+                    >
+                      إلغاء الدعوة
+                    </button>
+                  )}
+                </span>
+              </li>
+            )
+          })}
         </ul>
       </div>
 
@@ -79,6 +117,16 @@ export function AdminPage() {
           </p>
           <LessonCreateForm />
         </Modal>
+      )}
+      {confirmInvite && (
+        <ConfirmDialog
+          title="إلغاء الدعوة"
+          message={`سيتوقف رابط الدعوة المرسل إلى ${confirmInvite.email} عن العمل فورًا.`}
+          confirmLabel="إلغاء الدعوة"
+          busy={confirmBusy}
+          onConfirm={runRevoke}
+          onCancel={() => setConfirmInvite(null)}
+        />
       )}
     </main>
   )

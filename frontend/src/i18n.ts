@@ -1,5 +1,6 @@
 // Arabic-first strings. Backend messages stay English; map them here.
 // RTL only — codes/numbers/timers use dir="ltr" inline in components.
+import type { InviteStatus } from './api/types'
 import details from './i18n/details.json'
 
 export const str = {
@@ -219,6 +220,18 @@ export function detailById(id: string): string {
 
 /** The 429 message — one copy, shared by the toast and the inline error. */
 export const rateLimitedMessage = detailById('rate_limited')
+
+// Ticket 23: one Arabic label per invite status, shared by the admin list and
+// the acceptance page so the same invite can never show two wordings. The
+// three terminal states address the details.json catalog directly, so labels
+// and the error toasts for the same states agree word for word by
+// construction instead of by two hand-kept copies.
+export const inviteStatusAr: Record<InviteStatus, string> = {
+  active: 'بانتظار القبول',
+  used: detailById('invite_used'),
+  revoked: detailById('invite_revoked'),
+  expired: detailById('invite_expired'),
+}
 
 function localizeOne(detail: string): string {
   for (const { entry, matches } of matchers) {

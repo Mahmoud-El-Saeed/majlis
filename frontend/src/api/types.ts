@@ -3,7 +3,7 @@
 export type Role = 'admin' | 'teacher' | 'student'
 export type EnrollmentStatus = 'pending' | 'approved' | 'rejected' | 'blocked'
 export type DashboardEnrollmentStatus = EnrollmentStatus | 'owner' | 'admin'
-export type LessonStatus = 'processing' | 'ready' | 'failed'
+export type LessonStatus = 'pending' | 'processing' | 'ready'
 export type ShowResultMode = 'immediate' | 'after_publish'
 export type QuestionType = 'mcq' | 'tf' | 'essay'
 export type WindowStatus = 'open' | 'upcoming' | 'closed'
@@ -201,6 +201,7 @@ export type GradebookRowOut = {
   exam_title: string
   student_id: string
   student_email: string
+  student_name: string
   status: string
   score?: number | null
   max_score: number
@@ -210,13 +211,27 @@ export type GradebookRowOut = {
   answers: GradebookAnswerOut[]
 }
 
+export type InviteStatus = 'active' | 'used' | 'revoked' | 'expired'
+
 export type InviteOut = {
   id: string
   email: string
+  status: InviteStatus
   expires_at: string
   used_at?: string | null
   revoked_at?: string | null
   created_at: string
+}
+
+export type InviteLookupOut = {
+  email: string
+  status: InviteStatus
+}
+
+export type InviteRevokeOut = {
+  id: string
+  email: string
+  revoked_at: string
 }
 
 export type AttachmentOut = {

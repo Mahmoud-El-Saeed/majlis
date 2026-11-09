@@ -236,6 +236,11 @@ export function CodesQueuePage() {
               {str.noResults}
             </li>
           )}
+          {codeList.length === 0 && !codes.isPending && (
+            <li className="muted-t rounded-xl border border-dashed p-3 text-center text-sm" style={{ borderColor: 'var(--border)' }}>
+              لا رموز بعد
+            </li>
+          )}
         </ul>
       </div>
 
@@ -285,10 +290,14 @@ export function CodesQueuePage() {
             </li>
           ))}
           {pendingList.length === 0 && !pending.isPending && (
-            <p className="muted-t text-sm">لا طلبات معلقة</p>
+            <li className="muted-t rounded-xl border border-dashed p-3 text-center text-sm" style={{ borderColor: 'var(--border)' }}>
+              لا طلبات معلقة
+            </li>
           )}
           {pendingList.length > 0 && visiblePending.length === 0 && (
-            <p className="muted-t text-sm">{str.noResults}</p>
+            <li className="muted-t rounded-xl border border-dashed p-3 text-center text-sm" style={{ borderColor: 'var(--border)' }}>
+              {str.noResults}
+            </li>
           )}
         </ul>
       </div>
@@ -296,6 +305,11 @@ export function CodesQueuePage() {
       <div className="card mt-4 rounded-2xl p-5">
         <h2 className="font-heading mb-2 font-bold">كل الأعضاء (للحظر/فك الحظر)</h2>
         <ul className="grid gap-2">
+          {(all.data?.enrollments ?? []).length === 0 && !all.isPending && (
+            <li className="muted-t rounded-xl border border-dashed p-3 text-center text-sm" style={{ borderColor: 'var(--border)' }}>
+              لا أعضاء بعد
+            </li>
+          )}
           {(all.data?.enrollments ?? []).map((e) => (
             <li key={e.id} className="flex flex-wrap items-center justify-between gap-2 text-sm">
               <span>

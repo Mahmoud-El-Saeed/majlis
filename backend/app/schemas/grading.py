@@ -62,6 +62,7 @@ class GradebookRowOut(BaseModel):
     exam_title: str
     student_id: str
     student_email: str
+    student_name: str
     status: str
     score: int | None = None
     max_score: int

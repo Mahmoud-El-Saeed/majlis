@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import { ApiError } from '../api/client'
 import { api } from '../api/http'
+import type { InviteLookupOut } from '../api/types'
 import { useAuth } from '../features/auth/AuthContext'
-import { localizeDetail, str } from '../i18n'
+import { inviteStatusAr, localizeDetail, str } from '../i18n'
 import { ThemeToggle } from '../components/ThemeToggle'
 import { useToast } from '../components/Toast'
 
@@ -464,6 +466,13 @@ export function InviteAcceptPage() {
   const match = password === confirm
   const longEnough = password.length >= 8
   const canSubmit = token !== '' && match && longEnough
+  const lookup = useQuery({
+    queryKey: ['invite-lookup', token],
+    queryFn: () =>
+      api.get<InviteLookupOut>(`/invites/lookup?token=${encodeURIComponent(token)}`),
+    enabled: token !== '',
+    retry: false,
+  })
 
   if (token === '') {
     return (
@@ -478,8 +487,73 @@ export function InviteAcceptPage() {
     )
   }
 
+  if (lookup.isPending) {
+    return (
+      <AuthCard title="قبول دعوة معلم">
+        <p role="status" className="text-sm">
+          جار التحقق من الدعوة…
+        </p>
+      </AuthCard>
+    )
+  }
+
+  if (lookup.isError) {
+    const e = lookup.error
+    const message = e instanceof ApiError ? localizeDetail(e.detail) : str.unexpectedError
+    const isUnknownLink = e instanceof ApiError && e.status === 404
+    return (
+      <AuthCard title="قبول دعوة معلم">
+        <p role="alert" className="mb-3 text-sm" style={{ color: 'var(--secondary)' }}>
+          {message}
+        </p>
+        {!isUnknownLink && (
+          <button
+            type="button"
+            onClick={() => lookup.refetch()}
+            className="btn-secondary transition-ui mb-3 rounded-xl px-4 py-2"
+          >
+            {str.retry}
+          </button>
+        )}
+        <Link to="/login" className="underline">
+          {str.login}
+        </Link>
+      </AuthCard>
+    )
+  }
+
+  const invite = lookup.data
+  if (!invite) {
+    return (
+      <AuthCard title="قبول دعوة معلم">
+        <p role="status" className="text-sm">
+          جار التحقق من الدعوة…
+        </p>
+      </AuthCard>
+    )
+  }
+
+  if (invite.status !== 'active') {
+    return (
+      <AuthCard title="قبول دعوة معلم">
+        <p className="mb-3 text-sm">
+          الدعوة موجّهة إلى <span dir="ltr" className="font-bold">{invite.email}</span>
+        </p>
+        <p role="alert" className="mb-3 text-sm" style={{ color: 'var(--secondary)' }}>
+          {inviteStatusAr[invite.status]}
+        </p>
+        <Link to="/login" className="underline">
+          {str.login}
+        </Link>
+      </AuthCard>
+    )
+  }
+
   return (
     <AuthCard title="قبول دعوة معلم">
+      <p className="mb-3 text-sm">
+        الدعوة موجّهة إلى <span dir="ltr" className="font-bold">{invite.email}</span>
+      </p>
       <form
         noValidate
         onSubmit={async (e) => {

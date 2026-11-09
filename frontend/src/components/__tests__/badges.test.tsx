@@ -10,9 +10,9 @@ describe('andalusian badges', () => {
     expect(screen.queryByText(/pending/)).not.toBeInTheDocument()
   })
 
-  it('lesson badges cover processing/ready/failed in Arabic only', () => {
-    const ar: Record<string, string> = { processing: 'يُجهّز', ready: 'جاهز', failed: 'فشل' }
-    for (const s of ['processing', 'ready', 'failed'] as const) {
+  it('lesson badges cover pending/processing/ready in Arabic only', () => {
+    const ar: Record<string, string> = { pending: 'بانتظار', processing: 'يُجهّز', ready: 'جاهز' }
+    for (const s of ['pending', 'processing', 'ready'] as const) {
       const { unmount } = render(<LessonBadge status={s} />)
       expect(screen.getByText(ar[s])).toBeInTheDocument()
       expect(screen.queryByText(new RegExp(`\\b${s}\\b`))).not.toBeInTheDocument()
