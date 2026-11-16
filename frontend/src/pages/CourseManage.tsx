@@ -99,7 +99,7 @@ export function CourseManagePage() {
       <>
       {(lessons.data?.length ?? 0) > 0 && (
         <div className="mt-3">
-          <SearchBox value={query} onChange={setQuery} />
+          <SearchBox value={query} onChange={setQuery} placeholder={str.searchLessonsPlaceholder} />
         </div>
       )}
       {query && (lessons.data?.length ?? 0) > 0 && (

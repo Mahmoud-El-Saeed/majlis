@@ -1,4 +1,5 @@
 import { expect, test, type Page, type Route } from '@playwright/test'
+import { json } from './support/http'
 
 // ---------------------------------------------------------------------------
 // Ticket 22 — enrollment integrity at the surface:
@@ -14,21 +15,6 @@ import { expect, test, type Page, type Route } from '@playwright/test'
 // payload shapes the real backend uses, so the spec pins UI behaviour
 // without needing a live API.
 // ---------------------------------------------------------------------------
-
-const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'content-type, authorization',
-  'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
-}
-
-function json(route: Route, body: unknown, status = 200): Promise<void> {
-  return route.fulfill({
-    status,
-    contentType: 'application/json',
-    headers: { ...CORS_HEADERS },
-    body: JSON.stringify(body),
-  })
-}
 
 const COURSE_SEED = {
   id: 'C1',

@@ -14,6 +14,68 @@ export const fieldCls =
 export const fieldStyle = { backgroundColor: 'var(--surface)', borderColor: 'var(--border)' }
 export const btnPrimary = 'btn-primary transition-ui w-full rounded-xl px-4 py-2 font-bold'
 
+// Ticket 24: password field with a show/hide control. The label lives
+// OUTSIDE this wrapper (htmlFor + id at the call site) so the toggle
+// button's own text never folds into the input's accessible name — the
+// input is announced as exactly its field label, and the toggle stays a
+// separate, clearly named control.
+export function PasswordField({
+  id,
+  value,
+  onChange,
+  autoComplete,
+  minLength,
+  ariaInvalid,
+}: {
+  id: string
+  value: string
+  onChange: (v: string) => void
+  autoComplete: 'current-password' | 'new-password'
+  minLength?: number
+  ariaInvalid?: boolean
+}) {
+  const [show, setShow] = useState(false)
+  return (
+    <span className="relative block">
+      <input
+        id={id}
+        type={show ? 'text' : 'password'}
+        required
+        minLength={minLength}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        autoComplete={autoComplete}
+        aria-invalid={ariaInvalid}
+        dir="ltr"
+        className={`${fieldCls} pe-12 text-left`}
+        style={fieldStyle}
+      />
+      <button
+        type="button"
+        onClick={() => setShow((s) => !s)}
+        aria-pressed={show}
+        aria-label={show ? str.hidePassword : str.showPassword}
+        className="transition-ui clickable absolute end-2 top-1/2 -translate-y-1/2 flex h-8 w-8 items-center justify-center rounded-lg border"
+        style={{ borderColor: 'var(--border)', backgroundColor: 'var(--surface)' }}
+      >
+        {show ? (
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
+            <path d="M6.61 6.61A13.5 13.5 0 0 0 1 12s4 8 11 8a9.74 9.74 0 0 0 5.39-1.61" />
+            <line x1="2" y1="2" x2="22" y2="22" />
+            <path d="M9.88 9.88a3 3 0 1 0 4.24 4.24" />
+          </svg>
+        ) : (
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M2 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8" />
+            <circle cx="12" cy="12" r="3" />
+          </svg>
+        )}
+      </button>
+    </span>
+  )
+}
+
 export function AuthCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <main className="mx-auto w-full max-w-md px-4 pt-28 sm:px-6">
@@ -77,6 +139,7 @@ export function LoginPage() {
           <input
             type="email"
             required
+            autoComplete="email"
             value={email}
             onChange={(e) => {
               setEmail(e.target.value)
@@ -87,21 +150,21 @@ export function LoginPage() {
             style={fieldStyle}
           />
         </label>
-        <label className="mb-4 block">
-          <span className="mb-1 block text-sm">{str.password}</span>
-          <input
-            type="password"
-            required
+        <div className="mb-4 block">
+          <label htmlFor="login-password" className="mb-1 block text-sm">
+            {str.password}
+          </label>
+          <PasswordField
+            id="login-password"
             value={password}
-            onChange={(e) => {
-              setPassword(e.target.value)
+            onChange={(v) => {
+              setPassword(v)
               setErr(null)
               setVerifyLink(false)
             }}
-            className={fieldCls}
-            style={fieldStyle}
+            autoComplete="current-password"
           />
-        </label>
+        </div>
         {err && (
           <div role="alert" className="card mb-3 rounded-2xl p-3 text-sm" style={{ borderColor: 'var(--secondary)' }}>
             <p className="font-bold" style={{ color: 'var(--secondary)' }}>
@@ -189,38 +252,24 @@ export function SignupPage() {
         >
           <label className="mb-3 block">
             <span className="mb-1 block text-sm">{str.email}</span>
-            <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} className={fieldCls} style={fieldStyle} />
+            <input type="email" required autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} className={fieldCls} style={fieldStyle} />
           </label>
           <label className="mb-3 block">
             <span className="mb-1 block text-sm">{str.fullName}</span>
-            <input value={fullName} onChange={(e) => setFullName(e.target.value)} className={fieldCls} style={fieldStyle} />
+            <input value={fullName} onChange={(e) => setFullName(e.target.value)} autoComplete="name" className={fieldCls} style={fieldStyle} />
           </label>
-          <label className="mb-3 block">
-            <span className="mb-1 block text-sm">{str.password} (8+ أحرف)</span>
-            <input
-              type="password"
-              required
-              minLength={8}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              autoComplete="new-password"
-              className={fieldCls}
-              style={fieldStyle}
-            />
-          </label>
-          <label className="mb-3 block">
-            <span className="mb-1 block text-sm">{str.confirmPassword}</span>
-            <input
-              type="password"
-              required
-              value={confirm}
-              onChange={(e) => setConfirm(e.target.value)}
-              autoComplete="new-password"
-              aria-invalid={confirm !== '' && !match}
-              className={fieldCls}
-              style={fieldStyle}
-            />
-          </label>
+          <div className="mb-3 block">
+            <label htmlFor="signup-password" className="mb-1 block text-sm">
+              {str.passwordMinLabel}
+            </label>
+            <PasswordField id="signup-password" value={password} onChange={setPassword} autoComplete="new-password" minLength={8} />
+          </div>
+          <div className="mb-3 block">
+            <label htmlFor="signup-confirm" className="mb-1 block text-sm">
+              {str.confirmPassword}
+            </label>
+            <PasswordField id="signup-confirm" value={confirm} onChange={setConfirm} autoComplete="new-password" ariaInvalid={confirm !== '' && !match} />
+          </div>
           <div className="mb-4">
             <PasswordStrength value={password} />
           </div>
@@ -345,18 +394,12 @@ export function ResetPage() {
               }
             }}
           >
-            <label className="mb-4 block">
-              <span className="mb-1 block text-sm">{str.password} (8+ أحرف)</span>
-              <input
-                type="password"
-                required
-                minLength={8}
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                className={fieldCls}
-                style={fieldStyle}
-              />
-            </label>
+            <div className="mb-4 block">
+              <label htmlFor="reset-password" className="mb-1 block text-sm">
+                {str.passwordMinLabel}
+              </label>
+              <PasswordField id="reset-password" value={newPassword} onChange={setNewPassword} autoComplete="new-password" minLength={8} />
+            </div>
             {err && (
               <p role="alert" className="mb-3 text-sm" style={{ color: 'var(--secondary)' }}>
                 {err}
@@ -392,7 +435,7 @@ export function ResetPage() {
         >
           <label className="mb-4 block">
             <span className="mb-1 block text-sm">{str.email}</span>
-            <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} className={fieldCls} style={fieldStyle} />
+            <input type="email" required autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} className={fieldCls} style={fieldStyle} />
           </label>
           {emailErr && (
             <p role="alert" className="mb-3 text-sm" style={{ color: 'var(--secondary)' }}>
@@ -591,32 +634,18 @@ export function InviteAcceptPage() {
             style={fieldStyle}
           />
         </label>
-        <label className="mb-3 block">
-          <span className="mb-1 block text-sm">{str.password} (8+ أحرف)</span>
-          <input
-            type="password"
-            required
-            minLength={8}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            autoComplete="new-password"
-            className={fieldCls}
-            style={fieldStyle}
-          />
-        </label>
-        <label className="mb-3 block">
-          <span className="mb-1 block text-sm">{str.confirmPassword}</span>
-          <input
-            type="password"
-            required
-            value={confirm}
-            onChange={(e) => setConfirm(e.target.value)}
-            autoComplete="new-password"
-            aria-invalid={confirm !== '' && !match}
-            className={fieldCls}
-            style={fieldStyle}
-          />
-        </label>
+        <div className="mb-3 block">
+          <label htmlFor="invite-password" className="mb-1 block text-sm">
+            {str.passwordMinLabel}
+          </label>
+          <PasswordField id="invite-password" value={password} onChange={setPassword} autoComplete="new-password" minLength={8} />
+        </div>
+        <div className="mb-3 block">
+          <label htmlFor="invite-confirm" className="mb-1 block text-sm">
+            {str.confirmPassword}
+          </label>
+          <PasswordField id="invite-confirm" value={confirm} onChange={setConfirm} autoComplete="new-password" ariaInvalid={confirm !== '' && !match} />
+        </div>
         <div className="mb-4">
           <PasswordStrength value={password} />
         </div>

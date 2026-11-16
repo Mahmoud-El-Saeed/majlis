@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { AudioPlayer } from '../AudioPlayer'
+import { positionKey } from '../../features/media/playback'
 import { str } from '../../i18n'
 
 function mockMedia() {
@@ -20,13 +21,30 @@ function mockMedia() {
   return { play, pause }
 }
 
+function setCurrentTime(audio: HTMLAudioElement, v: number) {
+  Object.defineProperty(audio, 'currentTime', {
+    value: v,
+    writable: true,
+    configurable: true,
+  })
+}
+
+function setStoredPosition(v: string | null) {
+  try {
+    if (v === null) localStorage.removeItem(positionKey('L1'))
+    else localStorage.setItem(positionKey('L1'), v)
+  } catch {
+    /* ignore */
+  }
+}
+
 afterEach(() => {
   vi.restoreAllMocks()
 })
 
 async function renderReadyPlayer(fetchUrl = async () => 'https://example.com/lesson.mp3') {
   const onError = vi.fn()
-  const ui = render(<AudioPlayer fetchUrl={fetchUrl} onError={onError} />)
+  const ui = render(<AudioPlayer lessonId="L1" fetchUrl={fetchUrl} onError={onError} />)
   await waitFor(() => {
     expect(ui.container.querySelector('audio')).not.toBeNull()
   })
@@ -80,7 +98,7 @@ describe('AudioPlayer cassette (ticket 17)', () => {
       .mockRejectedValueOnce(new Error('expired'))
       .mockResolvedValue('https://example.com/fresh.mp3')
     const onError = vi.fn()
-    const ui = render(<AudioPlayer fetchUrl={fetchUrl} onError={onError} />)
+    const ui = render(<AudioPlayer lessonId="L1" fetchUrl={fetchUrl} onError={onError} />)
 
     expect(await screen.findByText('تعذّر التشغيل')).toBeInTheDocument()
     expect(onError).toHaveBeenCalledWith('تعذّر جلب رابط التشغيل')
@@ -183,5 +201,127 @@ describe('AudioPlayer cassette (ticket 17)', () => {
 
     fireEvent.click(screen.getByRole('button', { name: str.unmute }))
     expect(audio.muted).toBe(false)
+  })
+
+  it('ticket 24: restores the last position per lesson on load', async () => {
+    mockMedia()
+    setStoredPosition('65')
+    const { audio } = await renderReadyPlayer()
+    Object.defineProperty(audio, 'duration', { value: 125, configurable: true })
+    fireEvent.loadedMetadata(audio)
+    expect(audio.currentTime).toBe(65)
+    expect(await screen.findByText('01:05')).toBeInTheDocument()
+  })
+
+  it('ticket 24: clamps a stale position beyond duration', async () => {
+    mockMedia()
+    setStoredPosition('600')
+    const { audio } = await renderReadyPlayer()
+    Object.defineProperty(audio, 'duration', { value: 125, configurable: true })
+    fireEvent.loadedMetadata(audio)
+    expect(audio.currentTime).toBe(125)
+  })
+
+  it('ticket 24: ignores an invalid stored position and starts at 0', async () => {
+    mockMedia()
+    setStoredPosition('soon')
+    const { audio } = await renderReadyPlayer()
+    Object.defineProperty(audio, 'duration', { value: 125, configurable: true })
+    fireEvent.loadedMetadata(audio)
+    expect(audio.currentTime).toBe(0)
+  })
+
+  it('ticket 24: persists position on timeupdate and pause', async () => {
+    mockMedia()
+    setStoredPosition(null)
+    const { audio } = await renderReadyPlayer()
+    Object.defineProperty(audio, 'duration', { value: 125, configurable: true })
+    fireEvent.loadedMetadata(audio)
+    setCurrentTime(audio, 42)
+    fireEvent.timeUpdate(audio)
+    expect(localStorage.getItem(positionKey('L1'))).toBe('42')
+
+    setCurrentTime(audio, 50)
+    fireEvent.pause(audio)
+    expect(localStorage.getItem(positionKey('L1'))).toBe('50')
+  })
+
+  it('ticket 24: keeps the last position when the player unmounts in-app', async () => {
+    mockMedia()
+    setStoredPosition(null)
+    const { audio, unmount } = await renderReadyPlayer()
+    Object.defineProperty(audio, 'duration', { value: 125, configurable: true })
+    fireEvent.loadedMetadata(audio)
+    setCurrentTime(audio, 42)
+    fireEvent.timeUpdate(audio)
+
+    unmount()
+    expect(localStorage.getItem(positionKey('L1'))).toBe('42')
+  })
+
+  it('ticket 24: ±10s skips clamp at 0 and duration', async () => {
+    mockMedia()
+    const { audio } = await renderReadyPlayer()
+    Object.defineProperty(audio, 'duration', { value: 125, configurable: true })
+    fireEvent.loadedMetadata(audio)
+    setCurrentTime(audio, 65)
+    fireEvent.timeUpdate(audio)
+
+    fireEvent.click(screen.getByRole('button', { name: str.skipForward }))
+    expect(audio.currentTime).toBe(75)
+
+    fireEvent.click(screen.getByRole('button', { name: str.skipBack }))
+    expect(audio.currentTime).toBe(65)
+
+    setCurrentTime(audio, 5)
+    fireEvent.timeUpdate(audio)
+    fireEvent.click(screen.getByRole('button', { name: str.skipBack }))
+    expect(audio.currentTime).toBe(0)
+
+    setCurrentTime(audio, 120)
+    fireEvent.timeUpdate(audio)
+    fireEvent.click(screen.getByRole('button', { name: str.skipForward }))
+    expect(audio.currentTime).toBe(125)
+  })
+
+  it('ticket 24: skip reads the element position, not stale progress state', async () => {
+    mockMedia()
+    setStoredPosition(null)
+    const { audio } = await renderReadyPlayer()
+    Object.defineProperty(audio, 'duration', { value: 125, configurable: true })
+    fireEvent.loadedMetadata(audio)
+    // The element moves without a timeupdate (state still 0): the skip
+    // must advance from 65, never jump back from the stale state.
+    setCurrentTime(audio, 65)
+    fireEvent.click(screen.getByRole('button', { name: str.skipForward }))
+    expect(audio.currentTime).toBe(75)
+  })
+
+  it('ticket 24: speed select offers 0.75×–2× and sets playbackRate', async () => {
+    mockMedia()
+    const { audio } = await renderReadyPlayer()
+    const select = screen.getByLabelText(str.playbackSpeed) as HTMLSelectElement
+    const values = Array.from(select.options).map((o) => o.value)
+    expect(values).toContain('0.75')
+    expect(values).toContain('1')
+    expect(values).toContain('2')
+
+    fireEvent.change(select, { target: { value: '1.5' } })
+    expect(audio.playbackRate).toBe(1.5)
+
+    fireEvent.change(select, { target: { value: '0.75' } })
+    expect(audio.playbackRate).toBe(0.75)
+  })
+
+  it('ticket 24: seek saves the position', async () => {
+    mockMedia()
+    const { audio } = await renderReadyPlayer()
+    Object.defineProperty(audio, 'duration', { value: 125, configurable: true })
+    fireEvent.loadedMetadata(audio)
+    setCurrentTime(audio, 0)
+
+    fireEvent.change(screen.getByLabelText('التقدم'), { target: { value: '30' } })
+    expect(audio.currentTime).toBe(30)
+    expect(localStorage.getItem(positionKey('L1'))).toBe('30')
   })
 })

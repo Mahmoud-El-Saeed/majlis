@@ -60,7 +60,7 @@ backend/
 frontend/
 ├── src/
 │   ├── pages/               # login/signup/verify, student dashboard, teacher dashboard, admin
-│   ├── features/            # auth, courses, lessons (audio player), enrollment, exams, grades, chat
+│   ├── features/            # auth, courses, lessons (audio player), media (playback position), enrollment, exams, grades, chat
 │   ├── components/          # shared RTL UI primitives
 │   └── api/                 # typed client for the v1 endpoints
 └── …                        # bun project files

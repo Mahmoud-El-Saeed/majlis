@@ -3,6 +3,8 @@ import { str } from '../i18n'
 
 // Shared client-side search field: label بحث, ✕ clear button only when
 // non-empty, same look as the other inputs (fieldCls/fieldStyle).
+// Ticket 24: the placeholder is required so every search input is
+// discoverable; call sites supply the surface-specific Arabic copy.
 export function SearchBox({
   value,
   onChange,
@@ -10,7 +12,7 @@ export function SearchBox({
 }: {
   value: string
   onChange: (v: string) => void
-  placeholder?: string
+  placeholder: string
 }) {
   return (
     <label className="block">

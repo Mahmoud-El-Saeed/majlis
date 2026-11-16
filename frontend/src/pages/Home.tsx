@@ -6,6 +6,7 @@ import { ThemeToggle } from '../components/ThemeToggle'
 import heroArch from '../assets/hero-arch.svg'
 
 export function HomePage() {
+  const { user, loading } = useAuth()
   return (
     <main>
       <section className="zellige zellige-veil pt-28" id="hero" aria-label="البطل">
@@ -18,19 +19,28 @@ export function HomePage() {
               مجلس — دروس الشيخ منظمة
             </h1>
             <p className="muted-t mt-3">
-              حلقة مسجد خاصة: تسجيلات + نصوص + مرفقات + اختبارات + سؤال من الدروس — بالعربية أولًا.
+              حلقة مسجد خاصة: تسجيلات + نصوص + مرفقات + اختبارات — بالعربية أولًا.
             </p>
             <div className="mt-5 flex flex-wrap items-center gap-2">
-              <Link to="/signup" className="btn-primary transition-ui rounded-xl px-6 py-2 font-bold">
-                {str.signup}
-              </Link>
-              <Link
-                to="/login"
-                className="transition-ui clickable rounded-xl border px-6 py-2"
-                style={{ borderColor: 'var(--gold)' }}
-              >
-                {str.login}
-              </Link>
+              {!loading &&
+                (user ? (
+                  <Link to="/dashboard" className="btn-primary transition-ui rounded-xl px-6 py-2 font-bold">
+                    {str.goToDashboard}
+                  </Link>
+                ) : (
+                  <>
+                    <Link to="/signup" className="btn-primary transition-ui rounded-xl px-6 py-2 font-bold">
+                      {str.signup}
+                    </Link>
+                    <Link
+                      to="/login"
+                      className="transition-ui clickable rounded-xl border px-6 py-2"
+                      style={{ borderColor: 'var(--gold)' }}
+                    >
+                      {str.login}
+                    </Link>
+                  </>
+                ))}
               <ThemeToggle />
             </div>
           </div>
@@ -41,11 +51,10 @@ export function HomePage() {
       </section>
       <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
         <StarDivider label="المزايا" />
-        <section className="grid gap-4 py-6 sm:grid-cols-3" aria-label="المزايا">
+        <section className="grid gap-4 py-6 sm:grid-cols-2" aria-label="المزايا">
           {[
             { t: 'دروس منظمة', d: 'كل تسجيل مربوط بنصوصه ووصفه ومرفقاته' },
             { t: 'اختبارات عادلة', d: 'تصحيح تلقائي ومقالية بملاحظة الشيخ' },
-            { t: 'سؤال من الدروس', d: 'إجابات مستشهدة بالدرس والصفحات فقط' },
           ].map((f) => (
             <div key={f.t} className="card arabesque rounded-2xl p-5">
               <h2 className="font-heading font-bold">{f.t}</h2>

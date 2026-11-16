@@ -13,7 +13,7 @@ import { CourseManagePage } from './pages/CourseManage'
 import { LessonManagePage } from './pages/LessonManage'
 import { CodesQueuePage } from './pages/CodesQueue'
 import { CourseExamsPage, EssayGradingPage, ExamDetailManagePage, GradebookPage } from './pages/ExamAuthor'
-import { AdminPage, ChatStubPage, VaultStubPage } from './pages/Admin'
+import { AdminPage, VaultStubPage } from './pages/Admin'
 
 export default function App() {
   return (
@@ -30,7 +30,6 @@ export default function App() {
         <Route path="/dashboard" element={<RequireAuth><DashboardPage /></RequireAuth>} />
         <Route path="/account" element={<RequireAuth><AccountPage /></RequireAuth>} />
         <Route path="/courses/:id" element={<RequireAuth><CoursePage /></RequireAuth>} />
-        <Route path="/courses/:id/chat" element={<RequireAuth><ChatStubPage /></RequireAuth>} />
         <Route path="/lessons/:id" element={<RequireAuth><LessonPage /></RequireAuth>} />
         <Route path="/exams/:id" element={<RequireAuth><ExamTakePage /></RequireAuth>} />
         <Route path="/exams/:id/mine" element={<RequireAuth><MyAttemptsPage /></RequireAuth>} />

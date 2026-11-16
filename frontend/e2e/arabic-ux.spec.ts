@@ -1,4 +1,5 @@
 import { expect, test, type Page, type Route } from '@playwright/test'
+import { CORS_HEADERS, json } from './support/http'
 
 // ---------------------------------------------------------------------------
 // Ticket 21 — Arabic UX: specific error copy and a scoped language choice.
@@ -17,14 +18,8 @@ const DURATION_MINUTES = 30
 const ATTEMPTS_LIMIT = 2
 
 // The app talks to the API cross-origin (VITE_API_URL defaults to
-// http://localhost:8000/api/v1), so the fake answers the CORS preflight and
-// marks every response as readable by the page.
-const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'content-type, authorization',
-  'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
-}
-
+// http://localhost:8000/api/v1), so the shared fake helper answers the CORS
+// preflight and marks every response as readable by the page.
 type FakeOptions = {
   /** The English detail the join endpoint refuses with. */
   joinDetail?: string
@@ -32,15 +27,6 @@ type FakeOptions = {
   startDetail?: string
   /** The role the fake student/teacher has. */
   role?: 'student' | 'teacher'
-}
-
-function json(route: Route, body: unknown, status = 200): Promise<void> {
-  return route.fulfill({
-    status,
-    contentType: 'application/json',
-    headers: { ...CORS_HEADERS },
-    body: JSON.stringify(body),
-  })
 }
 
 const COURSE = {

@@ -14,10 +14,13 @@ export function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false)
 
   const linkCls = ({ isActive }: { isActive: boolean }) =>
-    `transition-ui clickable rounded-lg px-2 py-1 hover:opacity-80 ${isActive ? 'font-bold' : ''}`
+    `transition-ui clickable whitespace-nowrap rounded-lg px-2 py-1 hover:opacity-80 ${isActive ? 'font-bold' : ''}`
 
   // Collapse secondary links into a menu on small screens so the fixed
   // header stays one row and never overlaps page content (pt-28 offset).
+  // A student has no secondary links, so there is no hamburger for them —
+  // opening an empty menu only confused the bar.
+  const hasSecondary = Boolean(isTeacher || isAdmin)
   const secondaryLinks = (
     <>
       {(isTeacher || isAdmin) && (
@@ -35,10 +38,10 @@ export function Navbar() {
 
   return (
     <header
-      className="fixed inset-x-4 top-4 z-40 rounded-2xl px-4 py-3 shadow-md backdrop-blur"
+      className="fixed inset-x-4 top-4 z-40 rounded-2xl px-3 py-3 shadow-md backdrop-blur sm:px-4"
       style={{ backgroundColor: 'color-mix(in srgb, var(--surface) 80%, transparent)', border: '1px solid var(--border)' }}
     >
-      <div className="mx-auto flex max-w-6xl items-center justify-between gap-3">
+      <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 sm:gap-3">
         <Link to="/" className="flex items-center gap-2" aria-label="مجلس الرئيسية">
           <span
             className="btn-primary transition-ui flex h-9 w-9 items-center justify-center rounded-xl"
@@ -46,9 +49,9 @@ export function Navbar() {
           >
             <img src={logoStar} alt="" width={22} height={22} />
           </span>
-          <span className="font-heading text-xl font-bold">{str.appName}</span>
+          <span className="font-heading hidden text-xl font-bold min-[360px]:inline">{str.appName}</span>
         </Link>
-        <nav className="flex items-center gap-2 text-sm" aria-label="التنقل">
+        <nav className="flex items-center gap-1 text-sm sm:gap-2" aria-label="التنقل">
           {user ? (
             <>
               <NavLink
@@ -66,27 +69,33 @@ export function Navbar() {
               >
                 {accountNavLabel(lang)}
               </NavLink>
-              <span className="sm:hidden">
-                <button
-                  type="button"
-                  onClick={() => setMenuOpen((o) => !o)}
-                  aria-expanded={menuOpen}
-                  aria-label="القائمة"
-                  className="transition-ui clickable rounded-lg border px-3 py-1"
-                  style={{ borderColor: 'var(--border)' }}
-                >
-                  ☰
-                </button>
-              </span>
+              {hasSecondary && (
+                <span className="sm:hidden">
+                  <button
+                    type="button"
+                    onClick={() => setMenuOpen((o) => !o)}
+                    aria-expanded={menuOpen}
+                    aria-label={str.menu}
+                    className="transition-ui clickable flex h-7 w-9 items-center justify-center rounded-lg border"
+                    style={{ borderColor: 'var(--border)' }}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+                      <path d="M4 6h16" />
+                      <path d="M4 12h16" />
+                      <path d="M4 18h16" />
+                    </svg>
+                  </button>
+                </span>
+              )}
             </>
           ) : (
             <>
-              <Link to="/login" className="btn-primary transition-ui rounded-lg px-4 py-1.5">
+              <Link to="/login" className="btn-primary transition-ui whitespace-nowrap rounded-lg px-2 py-1.5 sm:px-4">
                 {str.login}
               </Link>
               <Link
                 to="/signup"
-                className="transition-ui clickable rounded-lg border px-4 py-1.5"
+                className="transition-ui clickable whitespace-nowrap rounded-lg border px-2 py-1.5 sm:px-4"
                 style={{ borderColor: 'var(--gold)' }}
               >
                 {str.signup}
@@ -95,14 +104,11 @@ export function Navbar() {
           )}
         </nav>
       </div>
-      {user && menuOpen && (
+      {user && hasSecondary && menuOpen && (
         <div className="mx-auto mt-2 flex max-w-6xl flex-col gap-1 border-t pt-2 text-sm sm:hidden" style={{ borderColor: 'var(--border)' }}>
           <span onClick={() => setMenuOpen(false)} className="contents">
             {secondaryLinks}
           </span>
-          <NavLink to="/account" className={linkCls} onClick={() => setMenuOpen(false)}>
-            {accountNavLabel(lang)}
-          </NavLink>
         </div>
       )}
     </header>

@@ -13,6 +13,7 @@ export const str = {
   logout: 'خروج',
   email: 'البريد الإلكتروني',
   password: 'كلمة المرور',
+  passwordMinLabel: 'كلمة المرور (8+ أحرف)',
   fullName: 'الاسم الكامل',
   verify: 'تفعيل الحساب',
   reset: 'استعادة كلمة المرور',
@@ -24,9 +25,9 @@ export const str = {
   exams: 'الاختبارات',
   lessonExam: 'اختبار الدرس',
   gradebook: 'سجل الدرجات',
-  chat: 'المحادثة',
   vault: 'مخزن المفاتيح',
   admin: 'الإدارة',
+  menu: 'القائمة',
   teacher: 'المعلم',
   student: 'الطالب',
   approve: 'قبول',
@@ -44,8 +45,6 @@ export const str = {
   publish: 'نشر',
   exportCsv: 'تصدير CSV',
   busy: 'الذكاء الاصطناعي مشغول — حاول لاحقًا',  quota: 'الاستعلامات اليومية',
-  refused: 'لم يُشرح في الدروس',
-  citation: 'الاستشهاد',
   stubNote: 'واجهة تجريبية — تُفعّل بعد بناء الواجهة الخلفية',
   notFound: 'غير موجود (404)',
   // The last resort when the backend sent something we do not know. It never
@@ -96,6 +95,22 @@ export const str = {
   volume: 'مستوى الصوت',
   mute: 'كتم الصوت',
   unmute: 'إلغاء الكتم',
+  // Ticket 24: lesson position resume + basic navigation.
+  skipBack: 'رجوع 10 ثوانٍ',
+  skipForward: 'تقدم 10 ثوانٍ',
+  playbackSpeed: 'سرعة التشغيل',
+  showPassword: 'إظهار كلمة المرور',
+  hidePassword: 'إخفاء كلمة المرور',
+  // Ticket 24: per-surface search placeholders (no call-site literals —
+  // one owner for all search copy; SearchBox requires one at every call).
+  searchCoursesPlaceholder: 'ابحث في سلاسلك…',
+  searchLessonsPlaceholder: 'ابحث في الدروس…',
+  searchExamsPlaceholder: 'ابحث في الاختبارات…',
+  searchCodesPlaceholder: 'ابحث في الرموز…',
+  searchPendingPlaceholder: 'ابحث في الطلبات…',
+  searchStudentsPlaceholder: 'ابحث عن طالب…',
+  // Ticket 24: vault card on the admin page (stub until tickets 10–12).
+  vaultCardHint: 'مفاتيح النماذج تُخزّن مشفّرة في قاعدة البيانات — الواجهة الكاملة تأتي مع بناء الخزنة.',
   formatPages: (from: string, to: string): string => `صفحات ${from} – ${to}`,
   // Ticket 19 codes repair: generate-form knobs + unblock-restore message.
   // Server defaults (50 uses / 7 days from CODE_DEFAULT_* in config.py) are

@@ -14,20 +14,24 @@ test('shell: RTL home with Andalusian hero + auth routes', async ({ page }) => {
 
   await page.goto('/login')
   await expect(page.getByLabel('البريد الإلكتروني')).toBeVisible()
-  await expect(page.getByLabel('كلمة المرور')).toBeVisible()
+  // exact: the show-password toggle's own name ("إظهار كلمة المرور") is a
+  // different, separately discoverable control (ticket 24 PasswordField).
+  await expect(page.getByLabel('كلمة المرور', { exact: true })).toBeVisible()
 
   await page.goto('/signup')
   await expect(page.getByRole('heading', { name: /حساب جديد/ })).toBeVisible()
 })
 
-test('shell: per-course chat and vault require auth (anon → login)', async ({ page }) => {
-  await page.goto('/courses/c1/chat')
-  await expect(page).toHaveURL(/\/login/)
-
+test('shell: vault requires auth; the chat route is removed until ticket 12', async ({ page }) => {
   await page.goto('/admin/vault')
   // Admin guard redirects anon to login; stub note visible when authed.
   // Anon assertion: redirected to login (no vault API attempted).
   await expect(page).toHaveURL(/\/login/)
+
+  // Ticket 24: /courses/:id/chat no longer exists — it must fall to 404
+  // (RAG/vault/eval gate do not exist yet, so a stub chat would mislead).
+  await page.goto('/courses/c1/chat')
+  await expect(page.getByRole('heading', { name: '404' })).toBeVisible()
 })
 
 test('shell: exam gating — anon redirected, writer message documented', async ({ page }) => {
@@ -248,7 +252,7 @@ test('live: signup → join → approve → listen → exam → grade', async ({
   // Student dashboard via UI (proves Bearer wiring + Join FAB → modal).
   await page.goto('/login')
   await page.getByLabel('البريد الإلكتروني').fill(studentEmail)
-  await page.getByLabel('كلمة المرور').fill(password)
+  await page.getByLabel('كلمة المرور', { exact: true }).fill(password)
   await page.getByRole('button', { name: 'تسجيل الدخول' }).click()
   await expect(page).toHaveURL(/\/dashboard/, { timeout: 15_000 })
   await page.getByRole('button', { name: 'انضم برمز السلسلة' }).click()

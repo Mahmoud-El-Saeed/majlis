@@ -157,7 +157,7 @@ export function DashboardPage() {
       <StarDivider />
       {dash.data && dash.data.items.length > 0 && (
         <div className="mt-4">
-          <SearchBox value={query} onChange={setQuery} />
+          <SearchBox value={query} onChange={setQuery} placeholder={str.searchCoursesPlaceholder} />
         </div>
       )}
       {query && dash.data && dash.data.items.length > 0 && (

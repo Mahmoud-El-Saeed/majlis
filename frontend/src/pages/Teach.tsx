@@ -61,7 +61,7 @@ export function TeachDashboard() {
       )}
       {owned.length > 0 && (
         <div className="mt-4">
-          <SearchBox value={query} onChange={setQuery} />
+          <SearchBox value={query} onChange={setQuery} placeholder={str.searchCoursesPlaceholder} />
         </div>
       )}
       {query && owned.length > 0 && (

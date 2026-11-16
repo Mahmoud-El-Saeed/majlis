@@ -160,7 +160,7 @@ export function CoursePage() {
         <section aria-label="الدروس" role="tabpanel" className="mt-4">
           {(lessons.data?.length ?? 0) > 0 && (
             <div className="mb-2">
-              <SearchBox value={lessonQuery} onChange={setLessonQuery} />
+              <SearchBox value={lessonQuery} onChange={setLessonQuery} placeholder={str.searchLessonsPlaceholder} />
             </div>
           )}
           {lessonQuery && (lessons.data?.length ?? 0) > 0 && (
@@ -230,7 +230,7 @@ export function CoursePage() {
         <section aria-label="الاختبارات" role="tabpanel" className="mt-4">
           {(studentExams.data?.length ?? 0) > 0 && (
             <div className="mb-2">
-              <SearchBox value={examQuery} onChange={setExamQuery} />
+              <SearchBox value={examQuery} onChange={setExamQuery} placeholder={str.searchExamsPlaceholder} />
             </div>
           )}
           {examQuery && (studentExams.data?.length ?? 0) > 0 && (
@@ -381,6 +381,8 @@ export function LessonPage() {
           <div className="card arch mt-4 p-6 sm:p-8">
             {lesson.data.status === 'ready' ? (
               <AudioPlayer
+                key={id}
+                lessonId={id}
                 fetchUrl={async () => {
                   const p = await api.get<PlayOut>(`/lessons/${id}/play`)
                   return p.playback_url

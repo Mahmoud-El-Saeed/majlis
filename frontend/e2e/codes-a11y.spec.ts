@@ -1,25 +1,11 @@
 import { expect, test, type Route } from '@playwright/test'
+import { json } from './support/http'
 import AxeBuilder from '@axe-core/playwright'
 
 // Ticket 23 — the codes page empty states must be valid list markup and the
 // page must be axe-clean. Mocked on purpose: the fake answers with empty
 // wrapped lists ({codes: []} / {enrollments: []}), so the spec pins the
 // empty-state DOM without needing a live API.
-
-const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'content-type, authorization',
-  'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
-}
-
-function json(route: Route, body: unknown, status = 200): Promise<void> {
-  return route.fulfill({
-    status,
-    contentType: 'application/json',
-    headers: { ...CORS_HEADERS },
-    body: JSON.stringify(body),
-  })
-}
 
 test('codes page empty states use valid list markup and axe reports no violations', async ({
   page,

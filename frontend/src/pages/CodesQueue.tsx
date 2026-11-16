@@ -207,7 +207,7 @@ export function CodesQueuePage() {
         </button>
         {codeList.length > 0 && (
           <div className="mt-3">
-            <SearchBox value={codeQuery} onChange={setCodeQuery} />
+            <SearchBox value={codeQuery} onChange={setCodeQuery} placeholder={str.searchCodesPlaceholder} />
           </div>
         )}
         {codeQuery && codeList.length > 0 && (
@@ -248,7 +248,7 @@ export function CodesQueuePage() {
         <h2 className="font-heading mb-2 font-bold">طلبات بانتظار المراجعة (الاسم/الهاتف/ملاحظة)</h2>
         {pendingList.length > 0 && (
           <div className="mb-2">
-            <SearchBox value={queueQuery} onChange={setQueueQuery} />
+            <SearchBox value={queueQuery} onChange={setQueueQuery} placeholder={str.searchPendingPlaceholder} />
           </div>
         )}
         {queueQuery && pendingList.length > 0 && (

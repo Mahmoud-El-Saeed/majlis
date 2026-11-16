@@ -1,4 +1,5 @@
 import { expect, test, type Page, type Route } from '@playwright/test'
+import { CORS_HEADERS, json } from './support/http'
 
 // ---------------------------------------------------------------------------
 // Ticket 20 — the exam-taking resume contract.
@@ -31,14 +32,8 @@ const MAX_SCORE = 4
 const ATTEMPT_ID = 'A1'
 
 // The app talks to the API cross-origin (VITE_API_URL defaults to
-// http://localhost:8000/api/v1), so the fake answers the CORS preflight and
-// marks every response as readable by the page.
-const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'content-type, authorization',
-  'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
-}
-
+// http://localhost:8000/api/v1), so the shared fake helper answers the CORS
+// preflight and marks every response as readable by the page.
 type FakeAnswer = {
   question_id: string
   selected_index: number | null
@@ -85,15 +80,6 @@ type FakeState = {
 
 function newState(): FakeState {
   return { attempts: [], requests: [] }
-}
-
-function json(route: Route, body: unknown, status = 200): Promise<void> {
-  return route.fulfill({
-    status,
-    contentType: 'application/json',
-    headers: { ...CORS_HEADERS },
-    body: JSON.stringify(body),
-  })
 }
 
 function questions(): FakeQuestion[] {

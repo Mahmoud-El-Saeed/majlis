@@ -75,7 +75,7 @@ export function ExamAuthorPage() {
       <h1 className="font-heading mt-1 text-2xl font-bold">تأليف الاختبارات</h1>
       {(exams.data?.length ?? 0) > 0 && (
         <div className="mt-3">
-          <SearchBox value={query} onChange={setQuery} />
+          <SearchBox value={query} onChange={setQuery} placeholder={str.searchExamsPlaceholder} />
         </div>
       )}
       {query && (exams.data?.length ?? 0) > 0 && (
@@ -918,7 +918,7 @@ export function GradebookPage() {
       <div className="card mt-3 overflow-x-auto rounded-2xl p-4">
         {rows.length > 0 && (
           <div className="mb-2">
-            <SearchBox value={query} onChange={setQuery} />
+            <SearchBox value={query} onChange={setQuery} placeholder={str.searchStudentsPlaceholder} />
           </div>
         )}
         {query && rows.length > 0 && (

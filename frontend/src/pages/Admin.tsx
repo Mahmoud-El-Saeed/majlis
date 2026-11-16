@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ApiError } from '../api/client'
 import { api } from '../api/http'
@@ -102,6 +103,14 @@ export function AdminPage() {
         >
           إنشاء درس
         </button>
+      </div>
+
+      <div className="card mt-4 rounded-2xl p-5">
+        <h2 className="font-heading mb-1 font-bold">{str.vault}</h2>
+        <p className="muted-t mb-3 text-sm">{str.vaultCardHint}</p>
+        <Link to="/admin/vault" className="transition-ui clickable rounded-xl border px-5 py-2" style={{ borderColor: 'var(--gold)' }}>
+          {str.vault}
+        </Link>
       </div>
 
       <Fab label="دعوة معلم" icon="mail" expanded onClick={() => setShowInvite(true)} />
@@ -310,43 +319,8 @@ export function VaultStubPage() {
   )
 }
 
-// Strict STUB per MASTER.md chat section — bubbles, citations, refusal,
-// quota UI; NO backend calls until tickets 10–12 land and the eval gate passes.
-export function ChatStubPage() {
-  return (
-    <main className="mx-auto w-full max-w-3xl px-4 pt-28 sm:px-6">
-      <div className="flex items-center justify-between">
-        <h1 className="font-heading text-2xl font-bold">{str.chat}</h1>
-        <span className="rounded-full border px-3 py-1 text-xs" style={{ borderColor: 'var(--gold)' }} dir="ltr">
-          27 / 30
-        </span>
-      </div>
-      <p className="card mt-2 rounded-2xl border p-3 text-sm" style={{ borderColor: 'var(--gold)' }}>
-        {str.stubNote} — تُجيب فقط من نصوص الدروس مع استشهاد عند البناء.
-      </p>
-      <div className="mt-3 grid gap-3 rounded-2xl p-4" style={{ backgroundColor: 'var(--sand)' }}>
-        <div className="user-bubble transition-ui max-w-[85%] justify-self-start rounded-2xl px-4 py-2">
-          ما حكم المسألة في الدرس الثالث؟
-        </div>
-        <div className="card max-w-[85%] justify-self-end rounded-2xl px-4 py-2">
-          <p>الشرح في الدرس الثالث أن الأصل الإباحة ما لم يرد نهي…</p>
-          <p className="mt-2 border-s-2 ps-2 text-xs font-bold" style={{ borderColor: 'var(--gold)' }}>
-            {str.citation}: الدرس ٣ • صفحات ٤٥–٦٢
-          </p>
-        </div>
-        <div className="card max-w-[85%] justify-self-end rounded-2xl border p-4" style={{ borderColor: 'var(--gold)' }}>
-          {str.refused} — لم يرد في الدروس المشروحة.
-        </div>
-      </div>
-      <form className="mt-3 flex gap-2" onSubmit={(e) => e.preventDefault()}>
-        <label className="flex-1">
-          <span className="sr-only">اسأل من الدروس</span>
-          <input placeholder="اسأل من الدروس…" className={fieldCls} style={fieldStyle} />
-        </label>
-        <button type="submit" className={btnPrimary} style={{ width: 'auto' }}>
-          إرسال
-        </button>
-      </form>
-    </main>
-  )
-}
+// Ticket 24: the per-course chat route is REMOVED until ticket 12 ships.
+// The RAG core, key vault and manual quality gate do not exist yet, so a
+// fake chat (bubbles, quota, citation) would promise answers it cannot
+// give. Re-adding it means: build the backend, then restore the UI —
+// never the other way round.

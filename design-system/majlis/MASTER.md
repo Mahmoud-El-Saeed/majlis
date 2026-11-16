@@ -95,8 +95,10 @@ Tailwind mapping: `font-heading: ['Reem Kufi','Amiri',serif]`, `font-body: ['Taj
 - **Forms:** `<label>` always (never placeholder-only), surface bg, sand border, primary focus ring.
   Join-with-code: code input `dir="ltr"`. Raw invite code shown once in inverted mono box + copy button.
 - **Audio player:** play tile `btn-primary` circle, `input[type=range]` with `accent-color:var(--primary)`,
-  `dir="ltr"` progress, time labels `mm:ss` ltr. Playback URLs expire in 1h — UI offers silent re-fetch,
-  never caches URL. Failed lesson = terracotta arch card + retry-with-fresh-URL button.
+  `dir="ltr"` progress, time labels `mm:ss` ltr. Resume restores the last position per lesson
+  (`mj_pos_<lessonId>`, clamped to duration); ±10s skip buttons and a 0.75×–2× speed select sit around
+  the progress bar; volume keeps the shared `mj_vol` key. Playback URLs expire in 1h — UI offers silent
+  re-fetch, never caches URL. Failed lesson = terracotta arch card + retry-with-fresh-URL button.
 - **Exam:** timer strip on sand wash with clock SVG; countdown from server `expires_at` (mock counts down in
   preview). Gradebook table: totals + per-question rows, CSV export button (Blob download).
 - **Chat:** user = `.user-bubble` (indigo-tint light / gold-tint dark, dark text fixed); assistant = surface card;

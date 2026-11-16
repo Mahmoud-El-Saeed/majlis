@@ -101,4 +101,31 @@ describe('AdminPage invite lifecycle', () => {
     expect(screen.getByText('used@example.com')).toBeInTheDocument()
     expect(screen.getByText('revoked@example.com')).toBeInTheDocument()
   })
+
+  it('links to the key vault stub from the admin page', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        if (String(url).endsWith('/invites')) {
+          return new Response(JSON.stringify({ invites: [] }), { status: 200 })
+        }
+        return new Response(JSON.stringify({ detail: 'Not found' }), { status: 404 })
+      }),
+    )
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    render(
+      <QueryClientProvider client={qc}>
+        <ToastProvider>
+          <MemoryRouter>
+            <AdminPage />
+          </MemoryRouter>
+        </ToastProvider>
+      </QueryClientProvider>,
+    )
+    await screen.findByText('الدروس')
+    expect(screen.getByRole('link', { name: 'مخزن المفاتيح' })).toHaveAttribute(
+      'href',
+      '/admin/vault',
+    )
+  })
 })
