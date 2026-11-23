@@ -54,3 +54,29 @@ platform (ticket 22 audit finding).
   the seam this repo tests.
 - Per-endpoint token buckets per user id: rejected — the public seams this
   protects (signup, login) run before any identity exists.
+
+## Amendment (ticket 25): Heroku appends, so production names its topology
+
+Heroku's router appends the client address it detected to the RIGHT of any
+`X-Forwarded-For` the client sent. Under the ticket-22 walk the rightmost
+entry is a proxy record to be dropped, so the bucket would key on the
+attacker-controlled leftmost value: rotating forged prefixes mints fresh
+buckets and bypasses the signup/login limit.
+
+- `RATE_LIMIT_CLIENT_IP_SOURCE` (Settings) replaces implicit inference:
+  - `peer` (default) — raw TCP peer; with `RATE_LIMIT_TRUSTED_PROXIES > 0`
+    it keeps the ticket-22 walk for configs that only set the hop count.
+  - `xff_trusted_walk` — the ticket-22 walk; compose sets this explicitly
+    (`N=1`) so the behaviour no longer depends on a default.
+  - `xff_rightmost` — key on the last comma-separated entry; Heroku sets
+    this. Forged prefixes cannot move the last entry, and two clients keep
+    separate buckets.
+- The limiter joins every `X-Forwarded-For` header value (RFC 7230 treats
+  duplicate fields as one comma-separated list). Router 2.0 appends the
+  detected address after the combined list, so the last entry stays the
+  unforgeable one even when a client sends several headers.
+- Operationally, `api.majlis.elsaeed.dev` (Cloudflare DNS record) must stay
+  grey-cloud (DNS-only). Orange-clouding it inserts a CDN hop in front of
+  the dyno, changing these semantics and requiring a return to the walk
+  mode with the correct hop count.
+

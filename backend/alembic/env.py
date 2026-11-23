@@ -24,7 +24,9 @@ from app.models import user as _user  # noqa: F401
 settings = get_settings()
 # Sync driver for migrations (asyncpg is async-only): postgres -> psycopg,
 # sqlite -> pysqlite. psycopg[binary] ships its own libpq, no system deps.
-SYNC_URL = settings.DATABASE_URL.replace("+asyncpg", "+psycopg").replace("+aiosqlite", "+pysqlite")
+# Ticket 25: the helper also moves asyncpg's `ssl=` back to psycopg's
+# `sslmode=` (Heroku SSL), so app and migrations cannot disagree.
+SYNC_URL = settings.sync_database_url()
 
 config = context.config
 target_metadata = Base.metadata

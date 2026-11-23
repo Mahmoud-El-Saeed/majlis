@@ -12,6 +12,15 @@ RATE_LIMIT_TRUSTED_PROXIES > 0 the rightmost N entries of X-Forwarded-For
 name the trusted proxies (Cloudflare, then nginx); the bucket keys on the
 rightmost entry before them. 0 keeps the raw TCP peer (dev, direct access),
 which was exactly the shared-bucket bug behind the reverse proxy.
+
+Ticket 25: Heroku's router appends the address it saw to the RIGHT of any
+client-supplied X-Forwarded-For, so the walk above would trust a forged
+prefix there. Production sets RATE_LIMIT_CLIENT_IP_SOURCE=xff_rightmost and
+keys on the last entry. Router 2.0 (the Common Runtime default since the
+legacy router's 2025 EOL) combines duplicate headers per RFC 7230 and
+appends after them, so `_forwarded_chain` joins every header value before
+taking the last; reading only the first header would let a client rotate
+buckets by sending a second one.
 """
 
 import logging
@@ -36,7 +45,11 @@ _redis: aioredis.Redis | None = None
 def get_redis() -> aioredis.Redis:
     global _redis
     if _redis is None:
-        _redis = aioredis.from_url(settings.REDIS_URL, decode_responses=True)
+        _redis = aioredis.from_url(
+            settings.REDIS_URL,
+            decode_responses=True,
+            **settings.redis_kwargs(),
+        )
     return _redis
 
 
@@ -53,25 +66,49 @@ LIMITED_ENDPOINTS: dict[str, int] = {
 }
 
 
+def _forwarded_chain(request: Request) -> list[str]:
+    """Parsed X-Forwarded-For entries across duplicate headers.
+
+    Router 2.0 combines duplicate header fields (RFC 7230) and appends the
+    address it saw at the right of the combined list, so every value must be
+    joined before the last entry is read.
+    """
+    values = request.headers.getlist("x-forwarded-for")
+    return [
+        part.strip()
+        for value in values
+        for part in value.split(",")
+        if part.strip()
+    ]
+
+
 def client_key(request: Request) -> str:
     """Bucket key identity for one request.
 
-    Trusted-proxy walk: each trusted proxy appends the peer it saw to
-    X-Forwarded-For; the rightmost `RATE_LIMIT_TRUSTED_PROXIES` entries are
-    therefore trusted proxy chains, and the entry before them is the client
-    as the innermost trusted proxy saw it. XFF shorter than that walks the
-    chain back to the leftmost entry (a no-forgery client behind the proxy).
-    No header → direct peer (dev, no proxy in front).
+    `xff_rightmost` (Heroku): the router appends the address it saw to the
+    right of any client-supplied header, so the last entry is the only one
+    that cannot be forged. A shorter/absent header falls back to the peer.
+
+    `xff_trusted_walk` (compose): each trusted proxy appends the peer it saw
+    to X-Forwarded-For; the rightmost `RATE_LIMIT_TRUSTED_PROXIES` entries
+    are therefore trusted proxy chains, and the entry before them is the
+    client as the innermost trusted proxy saw it. XFF shorter than that
+    walks the chain back to the leftmost entry.
+
+    `peer` keeps the raw TCP peer; with RATE_LIMIT_TRUSTED_PROXIES > 0 it
+    retains the ticket-22 walk for configs that only set the hop count.
     """
     direct = request.client.host if request.client else "unknown"
+    source = settings.RATE_LIMIT_CLIENT_IP_SOURCE
+    if source == "peer" and settings.RATE_LIMIT_TRUSTED_PROXIES <= 0:
+        return direct
+    chain = _forwarded_chain(request)
+    if not chain:
+        return direct
+    if source == "xff_rightmost":
+        return chain[-1]
     hops = settings.RATE_LIMIT_TRUSTED_PROXIES
     if hops <= 0:
-        return direct
-    xff = request.headers.get("x-forwarded-for")
-    if not xff:
-        return direct
-    chain = [part.strip() for part in xff.split(",") if part.strip()]
-    if not chain:
         return direct
     trusted_cut = max(len(chain) - hops, 0)
     untrusted = chain[:trusted_cut]

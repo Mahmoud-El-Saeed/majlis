@@ -8,6 +8,7 @@ from app.api.v1.router import api_router
 from app.core.config import get_settings
 from app.core.database import AsyncSessionLocal
 from app.core.rate_limit import rate_limit_middleware
+from app.core.security_headers import security_headers_middleware
 from app.services.admin_seed import ensure_admin_seed
 
 settings = get_settings()
@@ -52,11 +53,14 @@ def create_app() -> FastAPI:
     app.middleware("http")(rate_limit_middleware)
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=[settings.FRONTEND_URL],
+        allow_origins=settings.cors_origins(),
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
     )
+    # Registered last = outermost user middleware: preflights answered by
+    # CORSMiddleware and error responses are stamped too (ticket 25).
+    app.middleware("http")(security_headers_middleware)
     app.include_router(api_router, prefix="/api/v1")
 
     @app.get("/health")

@@ -59,6 +59,9 @@ services:
       # Ticket 22 (ADR-0011): one trusted proxy (nginx; Cloudflare in front)
       # marshals X-Forwarded-For, and rate-limit buckets key on the real
       # client it reports instead of on the proxy's own address.
+      # Ticket 25: the topology is named explicitly; `xff_rightmost` is
+      # Heroku-only and would trust a forged prefix here.
+      RATE_LIMIT_CLIENT_IP_SOURCE: ${RATE_LIMIT_CLIENT_IP_SOURCE:-xff_trusted_walk}
       RATE_LIMIT_TRUSTED_PROXIES: ${RATE_LIMIT_TRUSTED_PROXIES:-1}
       # Secrets and identity come from the shell environment (or an
       # `infra/.env` file, gitignored) — never hardcoded here. Dev defaults
@@ -80,7 +83,9 @@ services:
       # shell environment (or an `infra/.env` file) — never hardcoded here.
       # R2 CORS (set once in the Cloudflare dashboard for the bucket).
       # Valid values only: real scheme://host origins (no placeholders),
-      # methods GET/PUT/HEAD/DELETE (OPTIONS is rejected). Minimal rule:
+      # methods GET/PUT/HEAD/DELETE (OPTIONS is rejected). The bucket policy
+      # also allows the production origins; see ADR-0012 for the authoritative
+      # rule. Minimal local rule:
       # [{"AllowedOrigins": ["http://localhost:5173", "http://localhost:8080"],
       #   "AllowedMethods": ["PUT", "GET", "HEAD"],
       #   "AllowedHeaders": ["Content-Type", "Content-Length", "Range"],
@@ -90,7 +95,7 @@ services:
       S3_REGION: ${S3_REGION:-auto}
       S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-}
       S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-}
-      S3_BUCKET: ${S3_BUCKET:-majlis-media}
+      S3_BUCKET: ${S3_BUCKET:-majlis}
       S3_UPLOAD_EXPIRE_SEC: 900
       S3_PLAY_EXPIRE_SEC: 3600
     ports:
@@ -98,7 +103,7 @@ services:
     command:
       - sh
       - -c
-      - uv run alembic upgrade head && uv run uvicorn app.main:app --host 0.0.0.0 --port 8000
+      - alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\""]
       interval: 10s

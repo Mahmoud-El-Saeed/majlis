@@ -1,0 +1,25 @@
+# Ticket 25 (ADR-0012): Heroku container stack.
+#
+# Heroku sets the Docker build context to the Dockerfile's directory, so
+# `backend/Dockerfile` builds from `backend/` exactly as compose does.
+# The release phase runs in a fresh dyno from the built image; a non-zero
+# exit fails the release and leaves the previous version serving.
+build:
+  docker:
+    web: backend/Dockerfile
+
+release:
+  # `image: web` names the built image the release phase runs in; without it
+  # Heroku rejects the push ("Couldn't find the release image configured for
+  # this app"). `command` is one shell invocation: a multi-entry list would
+  # be joined as separate lines, running `alembic` with no subcommand.
+  image: web
+  command:
+    - alembic upgrade head
+
+run:
+  # Heroku Router 2.0 closes idle router<->dyno connections at 90 s; a
+  # server idle timeout below that races the router and produces H13/H18.
+  # 95 s lets the router initiate every close. No --proxy-headers: nothing
+  # in the app trusts forwarded scheme/proto.
+  web: uvicorn app.main:app --host 0.0.0.0 --port $PORT --timeout-keep-alive 95 --timeout-graceful-shutdown 20
