@@ -1,0 +1,56 @@
+# Ticket 26 (ADR-0013): publish the SPA to Cloudflare Pages on every push to
+# main. Direct Upload, not Git integration: `main` is the only environment, so
+# no preview deployments are ever created. The build runs here rather than on
+# Cloudflare, which is why VITE_API_URL is baked in below — a Pages project
+# environment variable would have no effect on a Direct Upload deployment.
+#
+# Needs only CLOUDFLARE_API_TOKEN (Account > Cloudflare Pages > Edit) and
+# CLOUDFLARE_ACCOUNT_ID. A failed build never reaches the deploy step, so the
+# previous production deployment keeps serving and this job goes red.
+name: Deploy frontend
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One production publish at a time; never cancel a deploy mid-upload.
+concurrency:
+  group: pages-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v7
+
+      # Same Bun as frontend/Dockerfile and the spec pin, so CI and the
+      # compose image resolve bun.lock identically.
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+
+      - run: bun install --frozen-lockfile
+
+      - run: bun run lint
+
+      - run: bun run test
+
+      - run: bun run build
+        env:
+          VITE_API_URL: https://api.majlis.elsaeed.dev/api/v1
+
+      - name: Publish to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: frontend
+          command: pages deploy dist --project-name=majlis-elsaeed --branch=main

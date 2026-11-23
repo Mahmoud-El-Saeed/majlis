@@ -2,25 +2,26 @@
 
 Companion to `.scratch/majlis-v1/spec.md`, `CONTEXT.md`, and `docs/adr/`. Ticket 01 builds from this file.
 
-## 1. Container architecture
+## 1. Production architecture (tickets 25–26)
 
 ```mermaid
 flowchart LR
-    Student([Student browser]) --> CF[Cloudflare<br/>TLS + CDN]
+    Student([Student browser]) --> CF[Cloudflare edge<br/>TLS + CDN + HSTS]
     Teacher([Teacher browser]) --> CF
     Admin([Admin]) --> CF
-    CF --> Proxy[Nginx reverse-proxy<br/>VPS]
-    Proxy --> FE[Frontend nginx<br/>React 19.3 static build]
-    Proxy --> API[FastAPI async API]
-    API --> PG[(Postgres 18.6<br/>metadata + transcripts + vault)]
-    API --> QD[(Qdrant v1.19<br/>1 collection / course)]
-    API --> RD[(Redis 8.10<br/>rate-limit + cache + rotation ptr)]
+    CF --> Pages[Cloudflare Pages<br/>React 19.3 static SPA<br/>majlis.elsaeed.dev]
+    CF --> Heroku[Heroku router + web dyno<br/>api.majlis.elsaeed.dev]
+    Heroku --> API[FastAPI async API]
+    API --> PG[(Heroku Postgres<br/>metadata + transcripts + vault)]
+    API --> RD[(Heroku Key-Value Store<br/>rate-limit + cache + rotation ptr)]
     API --> R2[(Cloudflare R2<br/>private audio bucket)]
     API --> LLMs[Groq / OpenRouter / Gemini<br/>via key vault]
     API --> SMTP[SMTP prod<br/>Mailpit in dev]
 ```
 
-Rules: browsers never touch R2/Postgres/Qdrant directly — every byte goes through presigned URLs (uploads) or signed playback URLs (streaming) after API membership checks. The VPS never stores media bytes.
+Rules: browsers never touch R2/Postgres/Qdrant directly — every byte goes through presigned URLs (uploads) or signed playback URLs (streaming) after API membership checks. The API dyno never stores media bytes.
+
+The SPA is published to Pages by `.github/workflows/pages-deploy.yml` on every push to `main` (ADR-0013); the API ships to Heroku from `heroku.yml` (ADR-0012). The compose stack below is the local/production-parity unit, not the production target; it additionally runs Qdrant for the planned RAG core (tickets 11–12).
 
 ## 2. Docker Compose topology (ticket 01)
 
@@ -54,7 +55,7 @@ backend/
 └── pyproject.toml           # uv + ruff config
 ```
 
-## 4. Frontend structure (React 19.3 + bun, served by its own nginx container)
+## 4. Frontend structure (React 19.3 + bun; Pages in production, own nginx container in compose)
 
 ```
 frontend/
@@ -63,10 +64,11 @@ frontend/
 │   ├── features/            # auth, courses, lessons (audio player), media (playback position), enrollment, exams, grades, chat
 │   ├── components/          # shared RTL UI primitives
 │   └── api/                 # typed client for the v1 endpoints
+├── public/_headers          # Pages response policy, pinned to infra/nginx.conf by src/pages-deploy.test.ts
 └── …                        # bun project files
 ```
 
-Arabic-first RTL throughout, responsive down to phone sizes, no native app in V1.
+Arabic-first RTL throughout, responsive down to phone sizes, no native app in V1. `VITE_API_URL` is baked at build time: the absolute Heroku API origin for Pages, same-origin `/api/v1` for compose (ADR-0013).
 
 ## 5. ERD (Postgres; Qdrant collections mirror lesson transcripts)
 

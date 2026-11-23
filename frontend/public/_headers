@@ -1,0 +1,23 @@
+# Ticket 26 (ADR-0013): response policy for the SPA on Cloudflare Pages.
+# The five security headers are byte-identical to infra/nginx.conf's
+# `location /` block (ADR-0010) — src/pages-deploy.test.ts pins the parity.
+# HSTS is deliberately absent: it belongs at the TLS edge, i.e. the zone's
+# Strict-Transport-Security setting, not in a static asset's headers.
+#
+# Rules apply in file order and repeated values are JOINED, so the narrow
+# /assets/* rule must come after /* and detach Cache-Control before setting
+# its own — otherwise the two max-age directives conflict (RFC 9111).
+
+/*
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=()
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; media-src 'self' blob: https:; connect-src 'self' https:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
+  Cache-Control: no-cache
+
+# Vite content-hashes everything under /assets/: safe to cache for a year.
+# theme-init.js and index.html are unhashed, so they stay on `no-cache` above.
+/assets/*
+  ! Cache-Control
+  Cache-Control: public, max-age=31536000, immutable

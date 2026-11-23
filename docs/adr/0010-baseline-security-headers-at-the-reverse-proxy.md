@@ -56,3 +56,17 @@ for all five on `/api/` and `/health` and remains the single source there;
 therefore partially reversed for the Heroku deployment only — the middleware
 does not own the SPA policy, and HSTS still belongs at the TLS edge.
 
+## Amendment (ticket 26): Pages carries the same SPA policy in `_headers`
+
+Production serves the SPA from Cloudflare Pages (ADR-0013), where there is no
+nginx hop we control. `frontend/public/_headers` stamps the same four baseline
+headers and the same `location /` CSP on `/*`, and
+`frontend/src/pages-deploy.test.ts` reads both files and fails if they drift —
+the "two places to keep in sync" objection above is answered by a contract
+test rather than by dropping the policy. The compose path is unchanged:
+`infra/nginx.conf` remains the single source there, and `frontend/nginx.conf`
+returns 404 for `/_headers` so the Pages control file is never served as a
+static asset. HSTS still belongs at the TLS edge — now the zone's
+`security_header` setting (six months, `includeSubDomains`, no preload) rather
+than a proxy in front of a VPS.
+
