@@ -23,10 +23,12 @@ build context is fixed to the directory containing the Dockerfile.
   `uv.lock` with `uv sync --no-dev --locked` and puts `.venv/bin` on
   `PATH`, so release/run commands are the real binaries rather than
   runtime `uv run` syncs.
-- **Migrations in the release phase.** `release.command` is
-  `alembic upgrade head`. Heroku runs it in a fresh dyno from the built
-  image; a non-zero exit fails the release and the previous version keeps
-  serving. The dyno is not started on a stale schema.
+- **Migrations in the release phase.** `release.image: web` names the built
+  image the release runs in, and `release.command` is one shell invocation
+  (`alembic upgrade head`): a multi-entry list is executed line by line, so
+  the argv form ran `alembic` with no subcommand. Heroku runs the release in
+  a fresh dyno from that image; a non-zero exit fails the release and the
+  previous version keeps serving. The dyno is not started on a stale schema.
 - **Keep-alive above the router's idle timeout.** Heroku Router 2.0 closes
   idle router-to-dyno connections at 90 s. `run.web` runs uvicorn with
   `--timeout-keep-alive 95` so every close is initiated by the router, plus
