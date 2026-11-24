@@ -4,12 +4,13 @@ from collections.abc import AsyncGenerator
 
 import pytest
 import pytest_asyncio
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 import app.services.admin_seed as seed_module
 from app.core.config import Settings
 from app.core.database import Base
-from app.models.user import Role
+from app.models.user import Role, User
 from app.services.admin_seed import ensure_admin_seed
 from tests.conftest import TEST_DATABASE_URL
 from tests.helpers import open_db_session
@@ -60,10 +61,16 @@ async def test_seed_creates_verified_admin_once(
     assert admin.role == Role.admin
     assert admin.is_verified is True
     await db.commit()
+    original_hash = admin.hashed_password
 
+    # Ticket 27: a restart re-runs the seed, even with a changed password in
+    # config. It must not add a second admin or rewrite the stored hash.
+    monkeypatch.setenv("ADMIN_PASSWORD", "rotated12345")
     again = await ensure_admin_seed(db)
     assert again is not None
     assert str(again.id) == str(admin.id)
+    assert again.hashed_password == original_hash
+    assert await db.scalar(select(func.count()).select_from(User)) == 1
 
 
 async def test_seed_rejects_invalid_email_loudly(

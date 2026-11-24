@@ -98,7 +98,8 @@ that are secrets are generated or supplied out of band):
 `DATABASE_URL` and `REDIS_URL` are attached by Heroku Postgres and the
 Key-Value Store. `S3_ACCESS_KEY_ID`/`S3_SECRET_ACCESS_KEY` are the R2 token
 secrets and are set by the operator, not in the repo. `ADMIN_*` and
-`SMTP_*` stay unset until tickets 27 and 28.
+`ADMIN_*` were set by ticket 27 (see amendment below); `SMTP_*` stay unset
+until ticket 28.
 
 ### R2 bucket CORS policy
 
@@ -123,5 +124,16 @@ dashboard) is:
   }
 ]
 ```
+
+## Amendment (ticket 27): admin bootstrap and backups
+
+`ADMIN_EMAIL` and `ADMIN_PASSWORD` are now set on the app from the operator's
+gitignored local env. The existing boot-time seed in `admin_seed.py` creates
+the first admin idempotently; it never duplicates the row or rewrites an
+existing password on restart. The operator commands and the rotation caveats
+live in `docs/ops/runbook.md`.
+
+Daily database backups use Heroku PGBackups on the `DATABASE_URL` attachment;
+the choice, retention and restore path are recorded in ADR-0014.
 
 
