@@ -84,7 +84,7 @@ Technical clarifications:
 - Package management: uv for backend, bun for frontend. Lint/format: ruff.
 - V1 media = audio only (~100–150MB per recording). No size limit enforced in app; operational cap is R2 budget.
 - Email required for verification/reset via SMTP (provider configurable).
-- TLS via Cloudflare to VPS proxy.
+- TLS terminates at the Cloudflare edge: Pages serves the SPA (`majlis.elsaeed.dev`) and Heroku terminates for the API (ADR-0012, ADR-0013). The compose stack keeps its own reverse proxy for local parity.
 
 Schema sketch (decision-rich, from design discussion):
 - users, teacher_invites, courses, lessons (with audio ref, media_type, transcript_voice TEXT, transcript_book TEXT), enrollment_codes with uses/expiry/audit, enrollments with status pending/approved/rejected/blocked, exams, questions, attempts, attempt_answers, grades projection, llm_api_keys encrypted, llm_usage_log, chat_cache, rag_chunks metadata.

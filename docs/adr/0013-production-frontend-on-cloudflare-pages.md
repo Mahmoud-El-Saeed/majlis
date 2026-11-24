@@ -34,15 +34,24 @@ setting.
   Edit) and `CLOUDFLARE_ACCOUNT_ID`. The token cannot touch DNS, zone settings
   or R2; those were configured out of band, once.
 - **A failed build cannot publish.** Lint, tests and `tsc -b && vite build`
-  run before the deploy step, so a red job leaves the previous production
-  deployment serving. Pages also keeps the last successful deployment if an
-  upload itself fails.
+  run before the deploy step, and a `test -f dist/_headers` gate sits between
+  them, so a red job — or a build that silently stopped copying the policy —
+  leaves the previous production deployment serving. Pages also keeps the last
+  successful deployment if an upload itself fails.
+- **The publisher is pinned.** Each action is referenced by commit SHA (with
+  the major tag in a trailing comment) and `wranglerVersion` is fixed, so a
+  deploy cannot change tooling underneath the two Cloudflare secrets.
 - **One publish at a time.** `concurrency: pages-production` with
   `cancel-in-progress: false`: a deploy is never cancelled mid-upload.
 - **`_headers` is the production SPA policy.** `frontend/public/_headers`
   (Vite copies `public/` into `dist/`) stamps ADR-0010's four baseline headers
   and the same SPA CSP, byte for byte, on `/*`. `src/pages-deploy.test.ts`
-  reads both files and fails on drift.
+  reads both files and fails on drift — in either direction, so an extra header
+  (HSTS included) cannot appear here alone.
+  Parity has a cost worth naming: `connect-src 'self' https:` is broader on
+  Pages, where the API is the single `api.majlis.elsaeed.dev` origin, than it
+  needs to be. It stays because the proxy's policy is the one policy; narrowing
+  it means narrowing both files at once, which is exactly what the test forces.
 - **The cache split mirrors `frontend/nginx.conf`.** `/*` gets
   `Cache-Control: no-cache`, so HTML and the unhashed `theme-init.js`
   revalidate; `/assets/*` detaches that value and sets
@@ -63,14 +72,25 @@ setting.
   the headers on that path.
 - **The custom domain is a proxied CNAME.** `majlis.elsaeed.dev` →
   `majlis-elsaeed.pages.dev`, orange-cloud, so the zone's edge settings apply.
-  The `pages.dev` alias stays reachable and is already in the API's CORS list
-  and the R2 bucket policy (ADR-0012).
+  The `pages.dev` alias serves the same build and is already in the API's CORS
+  list and the R2 bucket policy (ADR-0012); whether a given network can reach it
+  is a separate question (see Consequences).
 - **HSTS at the zone, not in `_headers`.** `security_header` on `elsaeed.dev`:
   `max_age=15552000` (six months), `include_subdomains=true`, `preload=false`,
   plus Always Use HTTPS so the first plain-HTTP visit is upgraded too.
   ADR-0010's reasoning holds — the TLS terminator owns HSTS.
   `include_subdomains` also covers the grey-cloud `api` host in browsers that
   have seen the header; no preload commitment is made.
+- **No third-party injection at the edge.** Cloudflare auto-provisions Web
+  Analytics with `auto_install` when a zone is added, and it injects
+  `static.cloudflareinsights.com/beacon.min.js` into HTML on proxied
+  hostnames. `script-src 'self'` blocks it, so every page load logged a CSP
+  violation. The zone's Web Analytics ruleset is therefore disabled
+  (`enabled: false`). Clearing `auto_install` and pausing or deleting the
+  ruleset's rules did **not** stop the injection — the ruleset's own `enabled`
+  flag is the switch, and it takes several minutes to propagate. Re-enabling
+  analytics means widening the CSP in both `infra/nginx.conf` and
+  `frontend/public/_headers`, which the contract test will force together.
 
 ## Consequences
 
@@ -83,6 +103,12 @@ setting.
   price of "no manual step" and of never letting the two header sources drift.
 - The `*.pages.dev` alias serves the same app and is not access-controlled. It
   is an accepted second origin, already allowlisted by the API and R2.
+- That alias resolves to `188.114.96.0/20`, which some ISPs (including the
+  operator's) blackhole: TCP connects time out from that network while the
+  custom domain's `104.21`/`172.67` addresses work. The alias is healthy at the
+  edge — proven by routing its hostname onto a reachable Cloudflare IP — so its
+  half of the acceptance check is edge evidence, not a real client on such a
+  network; the custom domain is the origin users actually reach.
 - Zone-wide HSTS with `include_subdomains` means any future subdomain of
   `elsaeed.dev` must be HTTPS-capable for six months after a browser sees the
   header.
@@ -110,6 +136,8 @@ setting.
 | Custom domain | `majlis.elsaeed.dev` (proxied CNAME, Google-issued certificate) |
 | Workflow | `.github/workflows/pages-deploy.yml` |
 | Repository secrets | `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` |
+| Publisher | `wrangler-action` at a pinned commit SHA, `wranglerVersion` fixed |
 | Build-time API base | `https://api.majlis.elsaeed.dev/api/v1` |
 | Zone HSTS | six months, `includeSubDomains`, no preload |
 | Zone Browser Cache TTL | `0` — Respect Existing Headers |
+| Zone Web Analytics | disabled (`enabled: false`) — its beacon violates `script-src 'self'` |

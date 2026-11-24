@@ -25,7 +25,36 @@ function nginxSpaHeaders(): Record<string, string> {
   return headers
 }
 
-type Rule = { path: string; lines: string[] }
+/** One path rule in a Pages `_headers` file, with its header lines in order. */
+class Rule {
+  readonly path: string
+  readonly lines: string[]
+
+  constructor(path: string, lines: string[]) {
+    this.path = path
+    this.lines = lines
+  }
+
+  /** Value a rule leaves behind: a `! Name` detach drops earlier values. */
+  value(name: string): string | undefined {
+    let value: string | undefined
+    for (const line of this.lines) {
+      if (line === `! ${name}`) value = undefined
+      else if (line.startsWith(`${name}:`)) value = line.slice(name.length + 1).trim()
+    }
+    return value
+  }
+
+  /** Header names the rule ends up sending, detaches applied. */
+  names(): string[] {
+    const sent = new Set<string>()
+    for (const line of this.lines) {
+      if (line.startsWith('! ')) sent.delete(line.slice(2).trim())
+      else sent.add(line.slice(0, line.indexOf(':')).trim())
+    }
+    return [...sent].sort()
+  }
+}
 
 /** Pages `_headers` rules in file order; order is load-bearing (see below). */
 function pagesRules(): Rule[] {
@@ -37,7 +66,7 @@ function pagesRules(): Rule[] {
       expect(rules.length, 'a header line must follow a path').toBeGreaterThan(0)
       rules[rules.length - 1].lines.push(line.trim())
     } else {
-      rules.push({ path: line.trim(), lines: [] })
+      rules.push(new Rule(line.trim(), []))
     }
   }
   return rules
@@ -47,16 +76,6 @@ const ruleFor = (rules: Rule[], path: string): Rule => {
   const rule = rules.find((r) => r.path === path)
   expect(rule, `_headers must define a ${path} rule`).toBeDefined()
   return rule!
-}
-
-/** Value a rule leaves behind: a `! Name` detach drops earlier values. */
-function valueOf(rule: Rule, name: string): string | undefined {
-  let value: string | undefined
-  for (const line of rule.lines) {
-    if (line === `! ${name}`) value = undefined
-    else if (line.startsWith(`${name}:`)) value = line.slice(name.length + 1).trim()
-  }
-  return value
 }
 
 describe('Pages headers match the compose proxy (ADR-0010)', () => {
@@ -71,19 +90,33 @@ describe('Pages headers match the compose proxy (ADR-0010)', () => {
     ])
     const all = ruleFor(pagesRules(), '/*')
     for (const [name, value] of Object.entries(expected)) {
-      expect(valueOf(all, name), `${name} must match infra/nginx.conf`).toBe(value)
+      expect(all.value(name), `${name} must match infra/nginx.conf`).toBe(value)
     }
+  })
+
+  it('sends nothing beyond the proxy policy and its own cache split', () => {
+    // The parity test above only proves nginx ⊆ _headers; without this, an
+    // extra header could ride along — HSTS in particular is the zone's job
+    // here, not the app's (ADR-0010).
+    expect(ruleFor(pagesRules(), '/*').names()).toEqual([
+      'Cache-Control',
+      'Content-Security-Policy',
+      'Permissions-Policy',
+      'Referrer-Policy',
+      'X-Content-Type-Options',
+      'X-Frame-Options',
+    ])
   })
 
   it('never caches HTML and caches hashed assets immutably', () => {
     const rules = pagesRules()
     const all = ruleFor(rules, '/*')
     const assets = ruleFor(rules, '/assets/*')
-    expect(valueOf(all, 'Cache-Control')).toBe('no-cache')
+    expect(all.value('Cache-Control')).toBe('no-cache')
     // Repeated Cache-Control values are joined into conflicting directives,
     // so the narrower rule must detach first — and come after the broad one.
     expect(assets.lines).toContain('! Cache-Control')
-    expect(valueOf(assets, 'Cache-Control')).toBe('public, max-age=31536000, immutable')
+    expect(assets.value('Cache-Control')).toBe('public, max-age=31536000, immutable')
     expect(rules.indexOf(all)).toBeLessThan(rules.indexOf(assets))
   })
 
@@ -97,6 +130,12 @@ describe('Pages headers match the compose proxy (ADR-0010)', () => {
         expect(line.trim().startsWith('/*'), 'a /* rewrite would shadow /assets/*').toBe(false)
       }
     }
+  })
+  it('keeps _headers out of the compose image', () => {
+    // Vite copies public/_headers into dist/. It is a Pages control file; the
+    // compose proxy owns its headers (infra/nginx.conf, ADR-0010), so serving
+    // it as a static asset would leak the wrong answer to the wrong server.
+    expect(read(resolve(frontendDir, 'nginx.conf'))).toMatch(/location = \/_headers \{\s*return 404;/)
   })
 })
 
@@ -117,5 +156,29 @@ describe('Pages deployment workflow (ticket 26)', () => {
 
   it('bakes the production API base at build time', () => {
     expect(workflow).toMatch(/VITE_API_URL:\s*https:\/\/api\.majlis\.elsaeed\.dev\/api\/v1/)
+  })
+
+  it('cannot publish a build that did not pass', () => {
+    const build = workflow.indexOf('bun run build')
+    const artifact = workflow.indexOf('test -f dist/_headers')
+    const publish = workflow.indexOf('name: Publish to Cloudflare Pages')
+    expect(build).toBeGreaterThan(-1)
+    // The artifact gate sits between them: a build that stopped copying
+    // public/_headers must fail before the upload, not ship a policy-less site.
+    expect(artifact).toBeGreaterThan(build)
+    expect(publish).toBeGreaterThan(artifact)
+    // One production publish at a time; a deploy is never cancelled mid-upload.
+    expect(workflow).toMatch(/cancel-in-progress:\s*false/)
+  })
+
+  it('builds and publishes with pinned tooling', () => {
+    for (const [, action] of workflow.matchAll(/uses:\s*(\S+)/g)) {
+      expect(action, `${action} must be pinned to a full commit`).toMatch(/@[0-9a-f]{40}$/)
+    }
+    expect(workflow).toMatch(/wranglerVersion:\s*\d+\.\d+\.\d+$/m)
+    // Same Bun as the compose image, so bun.lock resolves identically.
+    expect(/bun-version:\s*(\S+)/.exec(workflow)?.[1]).toBe(
+      /FROM oven\/bun:(\S+)/.exec(read(resolve(frontendDir, 'Dockerfile')))?.[1],
+    )
   })
 })

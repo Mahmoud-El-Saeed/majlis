@@ -19,7 +19,7 @@ flowchart LR
     API --> SMTP[SMTP prod<br/>Mailpit in dev]
 ```
 
-Rules: browsers never touch R2/Postgres/Qdrant directly — every byte goes through presigned URLs (uploads) or signed playback URLs (streaming) after API membership checks. The API dyno never stores media bytes.
+Rules: browsers never touch R2/Postgres directly — every byte goes through presigned URLs (uploads) or signed playback URLs (streaming) after API membership checks. The API dyno never stores media bytes.
 
 The SPA is published to Pages by `.github/workflows/pages-deploy.yml` on every push to `main` (ADR-0013); the API ships to Heroku from `heroku.yml` (ADR-0012). The compose stack below is the local/production-parity unit, not the production target; it additionally runs Qdrant for the planned RAG core (tickets 11–12).
 

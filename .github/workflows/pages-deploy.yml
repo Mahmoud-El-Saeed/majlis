@@ -29,11 +29,14 @@ jobs:
       run:
         working-directory: frontend
     steps:
-      - uses: actions/checkout@v7
+      # Pinned to commit SHAs: this job holds the production Cloudflare
+      # credentials, so a floating major tag must not be able to change the
+      # tools underneath it. The major is in the comment for updaters.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       # Same Bun as frontend/Dockerfile and the spec pin, so CI and the
       # compose image resolve bun.lock identically.
-      - uses: oven-sh/setup-bun@v2
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
           bun-version: 1.4.2
 
@@ -47,10 +50,16 @@ jobs:
         env:
           VITE_API_URL: https://api.majlis.elsaeed.dev/api/v1
 
+      # A build that stopped copying public/ would publish a site with no
+      # policy at all; fail here, before the upload, and keep the old deploy.
+      - name: Verify the artifact carries the Pages policy
+        run: test -f dist/_headers
+
       - name: Publish to Cloudflare Pages
-        uses: cloudflare/wrangler-action@v4
+        uses: cloudflare/wrangler-action@953926a2e2182532811c01a25e53647d93bf07c0 # v4
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          wranglerVersion: 4.167.0
           workingDirectory: frontend
           command: pages deploy dist --project-name=majlis-elsaeed --branch=main
