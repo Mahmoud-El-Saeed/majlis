@@ -75,6 +75,11 @@ services:
       SMTP_HOST: mailpit
       SMTP_PORT: 1025
       SMTP_FROM: ${SMTP_FROM:-Majlis <no-reply@majlis.local>}
+      # Ticket 28: local Mailpit stays plaintext and unauthenticated. Production
+      # sets these via Heroku config vars (Resend + STARTTLS), never here.
+      SMTP_TLS: ${SMTP_TLS:-none}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:8080}
       # First-admin bootstrap (seeded on API startup; no-op when unset).
       ADMIN_EMAIL: ${ADMIN_EMAIL:-}

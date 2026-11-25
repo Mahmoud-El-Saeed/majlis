@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import mail
 from app.core.config import get_settings
+from app.core.mail import MailTransportError
 from app.core.security import (
     DUMMY_HASH,
     create_access_token,
@@ -46,12 +47,17 @@ async def signup(db: AsyncSession, data: SignupIn) -> tuple[User, str]:
     await db.flush()
     token = create_verification_token(str(user.id))
     link = f"{settings.FRONTEND_URL}/verify?token={token}"
-    await asyncio.to_thread(
-        mail.send_email,
-        email,
-        "تفعيل حساب مجلس",
-        f"السلام عليكم ورحمة الله وبركاته،\nفعّل حسابك عبر هذا الرابط:\n\n\n{link}\n",
-    )
+    try:
+        await asyncio.to_thread(
+            mail.send_email,
+            email,
+            "تفعيل حساب مجلس",
+            f"السلام عليكم ورحمة الله وبركاته،\nفعّل حسابك عبر هذا الرابط:\n\n\n{link}\n",
+        )
+    except Exception as exc:
+        # Typed so the endpoint only blames the mail transport; a DB failure
+        # must not be mislabelled as a send failure.
+        raise MailTransportError from exc
     await db.refresh(user)
     return user, token
 
@@ -104,12 +110,16 @@ async def request_password_reset(db: AsyncSession, email: str) -> str | None:
         return None
     token = create_reset_token(str(user.id))
     link = f"{settings.FRONTEND_URL}/reset?token={token}"
-    await asyncio.to_thread(
-        mail.send_email,
-        user.email,
-        "استعادة كلمة مرور مجلس",
-        f"السلام عليكم ورحمة الله وبركاته،\nاستعد كلمة المرور عبر هذا الرابط:\n\n\n{link}\n",
-    )
+    try:
+        await asyncio.to_thread(
+            mail.send_email,
+            user.email,
+            "استعادة كلمة مرور مجلس",
+            f"السلام عليكم ورحمة الله وبركاته،\nاستعد كلمة المرور عبر هذا الرابط:\n\n\n{link}\n",
+        )
+    except Exception as exc:
+        # Internal signal only: the endpoint keeps its vague public message.
+        raise MailTransportError from exc
     return token
 
 

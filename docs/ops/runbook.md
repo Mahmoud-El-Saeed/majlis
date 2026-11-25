@@ -24,7 +24,7 @@ heroku logs --tail -a majlis-elsaeed-api
 Config vars: `APP_ENV=prod`, `FRONTEND_URL`, `CORS_ORIGINS`,
 `RATE_LIMIT_CLIENT_IP_SOURCE=xff_rightmost`, `DATABASE_SSL_REQUIRED=1`,
 `REDIS_SSL_CERT_REQS=none`, `S3_*`, `SECRET_KEY`, `ADMIN_EMAIL`,
-`ADMIN_PASSWORD`, and (ticket 28) `SMTP_*`. `DATABASE_URL` and `REDIS_URL` are
+`ADMIN_PASSWORD` and `SMTP_*` (see §5). `DATABASE_URL` and `REDIS_URL` are
 attached by Heroku. Config changes restart the web dyno; a release command
 (`alembic upgrade head`) runs first, and a failing release keeps the previous
 version live.
@@ -245,14 +245,46 @@ curl -s -o /dev/null -w '%{http_code}\n' https://api.majlis.elsaeed.dev/health  
 
 ### Mail credential (ticket 28)
 
-Ticket 28 adds the production SMTP credential; until it lands, there is no
-production mail secret to rotate. The procedure is: create the new provider
-credential first, set the app's `SMTP_*` credential config vars (the names
-ticket 28 chooses), let the dyno restart, verify with a real password-reset or
-invite email, and only then revoke the old provider credential. Creating the
-new credential before updating config avoids a send-failure window. Rotation
-has **no effect on live sessions** — signatures use `SECRET_KEY`, not the mail
-credential — and previously sent links stay valid.
+Production mail goes through Resend's SMTP relay (ADR-0015) as
+`Majlis <no-reply@majlis.elsaeed.dev>`. The sending domain
+`majlis.elsaeed.dev` must stay verified in Resend: keep the DKIM TXT at
+`resend._domainkey.majlis.elsaeed.dev` and the DNS-only CNAME
+`send.majlis.elsaeed.dev → send.forge.rmta.net`. There is no DMARC record in
+V1; adding `_dmarc.majlis.elsaeed.dev` with `v=DMARC1; p=none; adkim=r; aspf=r`
+is a future hardening step, not a send prerequisite.
+
+| Variable | Production value |
+| --- | --- |
+| `SMTP_HOST` | `smtp.resend.com` |
+| `SMTP_PORT` | `587` |
+| `SMTP_TLS` | `starttls` |
+| `SMTP_USERNAME` | `resend` |
+| `SMTP_PASSWORD` | sending-only Resend API key |
+| `SMTP_FROM` | `Majlis <no-reply@majlis.elsaeed.dev>` |
+
+The relay refuses credentials on a plaintext connection, and the app refuses
+to offer them unless TLS is active (`465` + `SMTP_TLS=ssl` is the equivalent
+implicit-TLS fallback if `587` egress is blocked). A half-set
+`SMTP_USERNAME`/`SMTP_PASSWORD` pair is rejected when mail is sent.
+
+To set or rotate the key, read it from the gitignored `backend/.env` without
+printing it, update config, then verify with a real password-reset or invite
+email before revoking the old credential:
+
+```bash
+smtp_password=$(sed -n 's/^SMTP_PASSWORD=//p' backend/.env | head -1)
+heroku config:set SMTP_HOST=smtp.resend.com SMTP_PORT=587 SMTP_TLS=starttls \
+  SMTP_USERNAME=resend SMTP_PASSWORD="$smtp_password" \
+  'SMTP_FROM=Majlis <no-reply@majlis.elsaeed.dev>' -a majlis-elsaeed-api
+unset smtp_password
+heroku config -a majlis-elsaeed-api --json | jq -r 'keys[] | select(startswith("SMTP_"))'  # names only
+```
+
+Creating the new credential first avoids a send-failure window. Rotation has
+**no effect on live sessions** — signatures use `SECRET_KEY`, not the mail
+credential — and previously sent links stay valid. A provider outage returns
+502 on signup/invite with nothing persisted, logs the cause server-side, and
+still returns the usual vague 200 on password-reset requests.
 
 ### Admin password
 
@@ -280,6 +312,7 @@ so. Migrations run once in the release phase, not in web dynos.
 | Seed admin | `heroku config:set ADMIN_EMAIL=… ADMIN_PASSWORD=…` (restart; creates only if absent) |
 | Rotate admin password | `heroku config:set ADMIN_PASSWORD=…` + the hash-update heredoc in §2 |
 | Rotate session keys | `heroku config:set SECRET_KEY="$(openssl rand -hex 32)"` |
+| Rotate mail key | create new Resend key, then the `heroku config:set SMTP_*` block in §5; revoke old key after a real send |
 | Capture backup | `heroku pg:backups:capture` |
 | Check backups | `heroku pg:backups` / `heroku pg:backups:schedules` |
 | Restore drill | `heroku pg:backups:restore bNNN RESTORE_URL --confirm majlis-elsaeed-api` |
@@ -301,5 +334,6 @@ _2026-11-24, ticket 27:_
   add-on was destroyed; the schedule and `b001` remained.
 - `SECRET_KEY` rotated: the pre-rotation access token returned 401 with the new
   key, a fresh login returned 200, and `/health` stayed 200.
-- Mail credential rotation is documented in §5; ticket 28 confirms the final
-  `SMTP_*` names. Media backups remain out of scope (ADR-0005).
+- Mail credential rotation is documented in §5; ticket 28 fixed the final
+  `SMTP_*` names and wired the Resend relay (ADR-0015). Media backups remain
+  out of scope (ADR-0005).

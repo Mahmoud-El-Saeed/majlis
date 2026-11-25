@@ -8,6 +8,8 @@ tests pin the translation layer in one place — Settings — so app and
 migrations cannot drift apart.
 """
 
+import pytest
+from pydantic import ValidationError
 from sqlalchemy.engine import make_url
 
 from app.core.config import Settings
@@ -138,3 +140,29 @@ def test_database_engine_pool_fits_the_essential_zero_connection_ceiling() -> No
 
     assert engine.pool.size() == 4
     assert engine.pool._max_overflow == 2
+
+
+def test_mail_defaults_keep_local_development_on_mailpit() -> None:
+    settings = _settings()
+
+    assert settings.SMTP_HOST == "localhost"
+    assert settings.SMTP_PORT == 1025
+    assert settings.SMTP_TLS == "none"
+    assert settings.SMTP_FROM == "Majlis <no-reply@majlis.local>"
+    assert settings.smtp_credentials() is None
+
+
+def test_smtp_credentials_are_all_or_nothing() -> None:
+    assert (
+        _settings(SMTP_USERNAME="resend", SMTP_PASSWORD="re_key").smtp_credentials()
+        == ("resend", "re_key")
+    )
+    with pytest.raises(ValueError, match="SMTP_USERNAME and SMTP_PASSWORD"):
+        _settings(SMTP_USERNAME="resend").smtp_credentials()
+    with pytest.raises(ValueError, match="SMTP_USERNAME and SMTP_PASSWORD"):
+        _settings(SMTP_PASSWORD="re_key").smtp_credentials()
+
+
+def test_smtp_tls_rejects_unknown_modes() -> None:
+    with pytest.raises(ValidationError, match="SMTP_TLS"):
+        _settings(SMTP_TLS="maybe")

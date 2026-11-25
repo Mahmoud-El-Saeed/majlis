@@ -16,7 +16,7 @@ flowchart LR
     API --> RD[(Heroku Key-Value Store<br/>rate-limit + cache + rotation ptr)]
     API --> R2[(Cloudflare R2<br/>private audio bucket)]
     API --> LLMs[Groq / OpenRouter / Gemini<br/>via key vault]
-    API --> SMTP[SMTP prod<br/>Mailpit in dev]
+    API --> SMTP[Resend SMTP prod<br/>Mailpit in dev]
 ```
 
 Rules: browsers never touch R2/Postgres directly — every byte goes through presigned URLs (uploads) or signed playback URLs (streaming) after API membership checks. The API dyno never stores media bytes.

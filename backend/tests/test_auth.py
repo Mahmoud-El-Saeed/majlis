@@ -93,6 +93,33 @@ async def test_password_reset_via_mailpit_seam(client):
     assert r.status_code == 200
 
 
+async def test_password_reset_mail_failure_is_not_an_enumeration_oracle(client, monkeypatch):
+    import app.core.mail as mail_module
+
+    await client.post(
+        "/api/v1/auth/signup",
+        json={"email": "resetfail@example.com", "password": "secret1234"},
+    )
+    outbox = client._transport.app.state.test_outbox  # type: ignore[union-attr]
+    token = outbox[-1]["body"].split("verify?token=")[1].split()[0].strip()
+    await client.post("/api/v1/auth/verify", json={"token": token})
+
+    def failing_send(to: str, subject: str, body: str) -> None:
+        raise ConnectionError("smtp down")
+
+    monkeypatch.setattr(mail_module, "send_email", failing_send)
+
+    known = await client.post(
+        "/api/v1/auth/password-reset/request", json={"email": "resetfail@example.com"}
+    )
+    unknown = await client.post(
+        "/api/v1/auth/password-reset/request", json={"email": "nobody@example.com"}
+    )
+
+    assert known.status_code == 200
+    assert known.json() == unknown.json()
+
+
 async def test_rate_limiting_enforced(client):
     # Signup limit is 10/min per IP in test memory fallback.
     for i in range(11):

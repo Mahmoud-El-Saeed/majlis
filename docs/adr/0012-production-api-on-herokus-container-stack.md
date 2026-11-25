@@ -72,8 +72,9 @@ build context is fixed to the directory containing the Dockerfile.
   rebuilds are driven by repo pushes (or a deliberate rebuild). That is the
   accepted cost of reusing the compose Dockerfile verbatim.
 - `ADMIN_*`, SMTP and backup configuration are deliberately not part of
-  this decision; tickets 27 and 28 own them. Signup will fail until 28
-  lands a production mail transport.
+  this decision; tickets 27 and 28 own them. Both have since landed: ticket
+  27 seeded the admin and ticket 28 wired the Resend mail transport
+  (ADR-0015), so live signup no longer fails for lack of SMTP.
 - The compose stack never needs a new required environment variable: every
   new setting has a dev-safe default.
 
@@ -97,9 +98,8 @@ that are secrets are generated or supplied out of band):
 
 `DATABASE_URL` and `REDIS_URL` are attached by Heroku Postgres and the
 Key-Value Store. `S3_ACCESS_KEY_ID`/`S3_SECRET_ACCESS_KEY` are the R2 token
-secrets and are set by the operator, not in the repo. `ADMIN_*` and
-`ADMIN_*` were set by ticket 27 (see amendment below); `SMTP_*` stay unset
-until ticket 28.
+secrets and are set by the operator, not in the repo. `ADMIN_*` was set by ticket 27 (see amendment below); `SMTP_*` was set by
+ticket 28 (see the amendment and ADR-0015).
 
 ### R2 bucket CORS policy
 
@@ -135,5 +135,13 @@ live in `docs/ops/runbook.md`.
 
 Daily database backups use Heroku PGBackups on the `DATABASE_URL` attachment;
 the choice, retention and restore path are recorded in ADR-0014.
+
+## Amendment (ticket 28): production mail
+
+`SMTP_*` are now set on the app from the operator's gitignored local env.
+`app.core.mail.send_email` negotiates STARTTLS (or implicit TLS) before
+authentication and refuses to send credentials in the clear; Mailpit remains
+the dev default. The sender, DNS records, failure policy and rotation procedure
+are recorded in ADR-0015 and `docs/ops/runbook.md`.
 
 

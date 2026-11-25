@@ -88,6 +88,13 @@ class Settings(BaseSettings):
     SMTP_HOST: str = "localhost"
     SMTP_PORT: int = 1025
     SMTP_FROM: str = "Majlis <no-reply@majlis.local>"
+    # Ticket 28: `none` keeps dev Mailpit plaintext; `starttls` upgrades a
+    # plaintext connection before authentication (Resend on 587); `ssl` is
+    # implicit TLS from the first packet (Resend on 465). Credentials are
+    # refused unless a TLS mode is selected.
+    SMTP_TLS: Literal["none", "starttls", "ssl"] = "none"
+    SMTP_USERNAME: str | None = None
+    SMTP_PASSWORD: str | None = None
     FRONTEND_URL: str = "http://localhost:8080"
     # Ticket 25: extra browser origins the API answers with CORS, comma
     # separated (Pages aliases, staging hosts). FRONTEND_URL is always
@@ -131,6 +138,21 @@ class Settings(BaseSettings):
     ATTACHMENT_MAX_FILE_BYTES: int = 100 * 1024 * 1024
     ADMIN_EMAIL: str | None = None
     ADMIN_PASSWORD: str | None = None
+
+    def smtp_credentials(self) -> tuple[str, str] | None:
+        """Credentials for SMTP auth, or None when the relay is unauthenticated.
+
+        Half a credential pair is a configuration error, not an anonymous
+        connection: failing here keeps a half-set Resend key from silently
+        sending nothing at all.
+        """
+        username = (self.SMTP_USERNAME or "").strip()
+        password = self.SMTP_PASSWORD or ""
+        if not username and not password:
+            return None
+        if not username or not password:
+            raise ValueError("SMTP_USERNAME and SMTP_PASSWORD must be set together.")
+        return username, password
 
     def cors_origins(self) -> list[str]:
         """Browser origins allowed by CORS; order preserved, duplicates gone."""

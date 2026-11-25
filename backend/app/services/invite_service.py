@@ -66,7 +66,8 @@ async def create_invite(db: AsyncSession, admin: User, email: str) -> tuple[Teac
     )
     try:
         await asyncio.to_thread(mail.send_email, normalized, "دعوة معلم إلى مجلس", body)
-    except Exception:
+    except Exception as exc:
+        mail.log_failure("teacher invite", exc)
         raise InviteTransportError("Failed to send invite email.") from None
     await db.refresh(invite)
     return invite, raw_token

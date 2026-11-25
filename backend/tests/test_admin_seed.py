@@ -32,6 +32,9 @@ async def db() -> AsyncGenerator[AsyncSession]:
 
     engine = create_async_engine(TEST_DATABASE_URL, future=True)
     async with engine.begin() as conn:
+        # Drop first: under random ordering the preceding test may have left
+        # rows behind, and the admin count below must reflect only this test.
+        await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)
     try:
         async with open_db_session() as session:

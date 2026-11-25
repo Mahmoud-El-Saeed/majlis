@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 
 from app.api.dependencies import CurrentUserDep, DbDep
+from app.core.mail import MailTransportError, log_failure
 from app.models.user import User
 from app.schemas.auth import (
     LoginIn,
@@ -45,7 +46,8 @@ async def signup(db: DbDep, data: SignupIn) -> SignupOut:
         user, _ = await auth_service.signup(db, data)
     except AuthError as e:
         raise HTTPException(status_code=400, detail=e.message) from None
-    except Exception:
+    except MailTransportError as exc:
+        log_failure("activation", exc)
         raise HTTPException(status_code=502, detail="Failed to send activation email.") from None
     return SignupOut(
         id=str(user.id),
@@ -111,7 +113,12 @@ async def update_me(db: DbDep, user: CurrentUserDep, data: UpdateMeIn) -> UserOu
 
 @router.post("/password-reset/request", response_model=MessageOut)
 async def reset_request(db: DbDep, data: ResetRequestIn) -> MessageOut:
-    await auth_service.request_password_reset(db, data.email)
+    try:
+        await auth_service.request_password_reset(db, data.email)
+    except MailTransportError as exc:
+        # A provider outage must not reveal which addresses are registered by
+        # status or body: the response stays identical to the unknown case.
+        log_failure("password reset", exc)
     return MessageOut(message="If the email is registered, you will receive a reset message.")
 
 
